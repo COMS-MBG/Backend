@@ -12,15 +12,15 @@ return new class extends Migration
 
             $table->id();
 
-            $table->string('nama');
+            $table->string('name');
 
             $table->string('email')->unique();
 
             $table->string('password');
 
-            $table->string('telepon')->nullable();
+            $table->string('phone')->nullable();
 
-            $table->string('foto')->nullable();
+            $table->string('profile_picture')->nullable();
 
             $table->boolean('is_active')->default(true);
 
