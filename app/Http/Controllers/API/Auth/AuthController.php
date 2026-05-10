@@ -22,20 +22,35 @@ class AuthController extends Controller
             ], 401);
         }
 
+        // Cek apakah akun aktif
+        if (!$user->is_active) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Akun Anda telah dinonaktifkan. Hubungi administrator.'
+            ], 403);
+        }
+
         $token = $user->createToken('auth_token')->plainTextToken;
+
+        // Load roles & permissions agar FE bisa langsung pakai
+        $user->load('roles:id,name', 'roles.permissions:id,name');
 
         return response()->json([
             'success' => true,
             'message' => 'Login berhasil',
-            'token' => $token,
-            'user' => $user,
+            'token'   => $token,
+            'user'    => $user,
         ]);
     }
 
     public function profile(Request $request): JsonResponse
     {
+        $user = $request->user();
+        $user->load('roles:id,name', 'roles.permissions:id,name');
+
         return response()->json([
-            'user' => $request->user()
+            'success' => true,
+            'user'    => $user,
         ]);
     }
 

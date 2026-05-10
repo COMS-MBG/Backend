@@ -20,7 +20,7 @@ return new class extends Migration
             $table->string('vehicle_plate', 20)->nullable();
             $table->timestamp('departed_at')->nullable();
             $table->timestamp('arrived_at')->nullable();
-            $table->integer('duration_minutes')->nullable()->storedAs("EXTRACT(EPOCH FROM (arrived_at - departed_at)) / 60");
+            $table->integer('duration_minutes')->nullable()->storedAs("TIMESTAMPDIFF(MINUTE, departed_at, arrived_at)");
             $table->string('proof_photo_path')->nullable();
             $table->json('route_snapshot')->nullable()->comment('GeoJSON of the route taken');
             $table->decimal('distance_km', 8, 3)->nullable();
