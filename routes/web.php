@@ -2,6 +2,8 @@
 
 use Illuminate\Support\Facades\Route;
 
+Route::view('/scalar', 'scalar');
+
 Route::get('/', function () {
     return view('welcome');
 });

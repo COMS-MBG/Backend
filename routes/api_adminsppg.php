@@ -15,7 +15,7 @@ use App\Http\Controllers\API\AdminSPPG\FinancialReportController;
 use App\Http\Controllers\API\AdminSPPG\RoleController;       // ← tambahan baru
 use App\Http\Controllers\API\AdminSPPG\PermissionController; // ← tambahan baru
 
-Route::middleware(['au:sanctum'])
+Route::middleware(['auth:sanctum'])
     ->prefix('admin-sppg')
     ->group(function () {
 
