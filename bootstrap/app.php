@@ -16,6 +16,11 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Enable Sanctum's stateful middleware on API routes.
+        // This is CRITICAL for cookie/session auth on SPA requests.
+        // It adds: EncryptCookies, StartSession, VerifyCsrfToken, etc.
+        $middleware->statefulApi();
+
         $middleware->alias([
             'role' => RoleMiddleware::class,
             'permission' => PermissionMiddleware::class,
