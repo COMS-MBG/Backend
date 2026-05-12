@@ -27,6 +27,19 @@ class RBACService
             'distribution.view',
             // Nutrition
             'nutrition.view',
+            // Partner
+            'partner.view', 'partner.create', 'partner.edit', 'partner.delete', 'partner.import',
+        ],
+        // admin-sppg = alias for the main SPPG administrator role
+        'admin-sppg' => [
+            'sppg.view',
+            'school.view', 'school.create', 'school.edit',
+            'employee.view', 'employee.create', 'employee.edit', 'employee.delete',
+            'finance.view', 'finance.create', 'finance.edit',
+            'nutrition.view',
+            'distribution.view',
+            // Partner
+            'partner.view', 'partner.create', 'partner.edit', 'partner.delete', 'partner.import',
         ],
         'pemilik' => [
             'sppg.view',
@@ -35,6 +48,8 @@ class RBACService
             'finance.view', 'finance.create', 'finance.edit',
             'nutrition.view',
             'distribution.view',
+            // Partner
+            'partner.view', 'partner.create', 'partner.edit', 'partner.delete', 'partner.import',
         ],
         'manajer' => [
             'sppg.view',
@@ -43,6 +58,8 @@ class RBACService
             'finance.view', 'finance.create',
             'nutrition.view',
             'distribution.view',
+            // Partner
+            'partner.view', 'partner.create', 'partner.edit', 'partner.import',
         ],
         'ahli_gizi' => [
             'nutrition.view', 'nutrition.create', 'nutrition.edit', 'nutrition.delete',
@@ -73,12 +90,13 @@ class RBACService
         $allPermissions = collect(self::ROLES_PERMISSIONS)->flatten()->unique();
 
         foreach ($allPermissions as $permission) {
-            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'api']);
+            // 'web' guard = Sanctum SPA session guard
+            Permission::firstOrCreate(['name' => $permission, 'guard_name' => 'web']);
         }
 
         // Buat roles dan sync permissions
         foreach (self::ROLES_PERMISSIONS as $roleName => $permissions) {
-            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'api']);
+            $role = Role::firstOrCreate(['name' => $roleName, 'guard_name' => 'web']);
             $role->syncPermissions($permissions);
         }
     }

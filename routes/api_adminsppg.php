@@ -12,6 +12,7 @@ use App\Http\Controllers\API\AdminSPPG\CourierTrackingController;
 use App\Http\Controllers\API\AdminSPPG\DashboardController;
 use App\Http\Controllers\API\AdminSPPG\DistributionMapController;
 use App\Http\Controllers\API\AdminSPPG\FinancialReportController;
+use App\Http\Controllers\API\AdminSPPG\PartnerController;
 use App\Http\Controllers\API\AdminSPPG\RoleController;       // ← tambahan baru
 use App\Http\Controllers\API\AdminSPPG\PermissionController; // ← tambahan baru
 
@@ -29,6 +30,11 @@ Route::middleware(['auth:sanctum'])
         Route::post('employees/{employee}/assign-role', [EmployeeController::class, 'assignRole']);
         Route::apiResource('roles', RoleController::class);
         Route::get('permissions', [PermissionController::class, 'index']); // list semua permission
+
+        // Partner Management
+        Route::get('partners/summary',  [PartnerController::class, 'summary']);
+        Route::post('partners/import',  [PartnerController::class, 'import']);
+        Route::apiResource('partners',  PartnerController::class);
     });
 
     // ── Semua Admin SPPG (tanpa role restriction) ─────────────────────────────
