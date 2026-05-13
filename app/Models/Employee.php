@@ -4,7 +4,6 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
-//use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Employee extends Model
 {
@@ -12,7 +11,12 @@ class Employee extends Model
 
     protected $table = 'employees';
 
-    const ROLES = [
+    /**
+     * Posisi/jabatan struktural karyawan.
+     * Dipakai untuk validasi di StoreEmployeeRequest / UpdateEmployeeRequest.
+     * Ini label struktural, BUKAN role RBAC.
+     */
+    const POSITIONS = [
         'pemilik',
         'manajer',
         'ahli_gizi',
@@ -22,80 +26,92 @@ class Employee extends Model
     ];
 
     protected $fillable = [
-        'user_id',
         'sppg_id',
-        'nama',
+        'user_id',
+        'role_id',
+        'name',
         'nik',
-        'jabatan',
-        'telepon',
-        'alamat',
-        'tanggal_bergabung',
-        'gaji_pokok',
+        'position',
+        'phone',
+        'address',
+        'photo',
+        'joined_at',
+        'base_salary',
         'status',
-        'foto',
-        'role_id',      // ← tambahan baru: FK ke tabel roles (untuk permission system)
     ];
 
     protected $casts = [
-        'tanggal_bergabung' => 'date',
-        'gaji_pokok'        => 'decimal:2',
+        'joined_at'   => 'date',
+        'base_salary' => 'decimal:2',
     ];
 
-    protected $hidden = ['gaji_pokok'];
+    protected $hidden = ['base_salary'];
 
-    // ─── Relationships ─────────────────────────────────────────────────────────
+    // ── Relationships ─────────────────────────────────────────────────────────
 
-    public function user()
+    public function user(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
     }
 
-    public function sppg()
+    public function sppg(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(SPPG::class, 'sppg_id');
     }
 
     /**
-     * Relasi ke Role (untuk sistem permission).
-     * Berbeda dengan kolom 'jabatan' yang hardcoded di const ROLES,
-     * role_id ini menghubungkan ke tabel roles untuk mengatur akses fitur.
+     * Role sistem untuk akses fitur.
+     * Berbeda dari 'position' yang hanya label struktural.
      */
-    public function role()
+    public function role(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
-        return $this->belongsTo(Role::class, 'role_id')->withDefault([
-            'name' => 'No Role Assigned',
-        ]);
+        return $this->belongsTo(Role::class, 'role_id')
+            ->withDefault([
+                'name' => 'Tanpa Akses',
+                'slug' => null,
+            ]);
     }
 
-    // ─── Scopes ────────────────────────────────────────────────────────────────
+    // ── Scopes ────────────────────────────────────────────────────────────────
 
-    public function scopeKurir($query)
+    public function scopeActive($query)
     {
-        return $query->where('jabatan', 'kurir');
+        return $query->where('status', 'active');
     }
 
-    public function scopeAktif($query)
-    {
-        return $query->where('status', 'aktif');
-    }
-
-    public function scopeBySppg($query, string $sppgId)
+    public function scopeBySppg($query, int $sppgId)
     {
         return $query->where('sppg_id', $sppgId);
     }
 
-    // ─── Helpers ───────────────────────────────────────────────────────────────
-
-    public function hasPermission(string $permissionSlug): bool
+    public function scopeWithSystemAccess($query)
     {
-        if (!$this->role_id) {
-            return false;
-        }
-        return $this->role->hasPermission($permissionSlug);
+        return $query->whereNotNull('user_id')->whereNotNull('role_id');
     }
 
-    public function isActive(): bool
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
+    /**
+     * Cek apakah employee punya permission tertentu via role-nya.
+     */
+    public function hasPermission(string $permissionSlug): bool
     {
-        return $this->status === 'aktif';
+        if (!$this->role_id) return false;
+
+        if (!$this->relationLoaded('role')) {
+            $this->load('role.permissions');
+        }
+
+        return $this->role->permissions
+            ->pluck('slug')
+            ->contains($permissionSlug);
+    }
+
+    /**
+     * Apakah karyawan ini punya akun dan role sistem?
+     */
+    public function hasSystemAccess(): bool
+    {
+        return $this->user_id !== null && $this->role_id !== null;
     }
 }

@@ -23,7 +23,7 @@ class EmployeeController extends Controller
         $employees = $this->employeeService->getAll(
             $sppgId,
             $request->only([
-                'jabatan',
+                'position',
                 'status',
                 'search'
             ]),

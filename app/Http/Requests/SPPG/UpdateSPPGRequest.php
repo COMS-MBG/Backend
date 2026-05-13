@@ -8,24 +8,24 @@ class UpdateSPPGRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('sppg.edit');
+        return $this->user()?->hasPermission('sppg.edit') ?? false;
     }
 
     public function rules(): array
     {
         return [
-            'nama'       => 'sometimes|string|max:255',
-            'alamat'     => 'sometimes|string',
-            'latitude'   => 'sometimes|numeric|between:-90,90',
-            'longitude'  => 'sometimes|numeric|between:-180,180',
-            'kapasitas'  => 'sometimes|integer|min:1|max:100',
-            'status'     => 'sometimes|in:aktif,nonaktif,pengajuan',
-            'telepon'    => 'nullable|string|max:20',
-            'email'      => 'nullable|email|max:255',
-            'kecamatan'  => 'nullable|string|max:100',
-            'kota'       => 'nullable|string|max:100',
-            'provinsi'   => 'nullable|string|max:100',
-            'pemilik_id' => 'nullable|uuid|exists:users,id',
+            'name'        => 'sometimes|string|max:255',
+            'address'     => 'sometimes|string',
+            'latitude'    => 'sometimes|numeric|between:-90,90',
+            'longitude'   => 'sometimes|numeric|between:-180,180',
+            'capacity'    => 'sometimes|integer|min:1|max:100',
+            'status'      => 'sometimes|in:active,inactive,pending',
+            'phone'       => 'nullable|string|max:20',
+            'email'       => 'nullable|email|max:255',
+            'district'    => 'nullable|string|max:100',
+            'city'        => 'nullable|string|max:100',
+            'province'    => 'nullable|string|max:100',
+            'pemilik_id'  => 'nullable|exists:users,id',
         ];
     }
 }

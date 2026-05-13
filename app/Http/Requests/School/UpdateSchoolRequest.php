@@ -8,7 +8,7 @@ class UpdateSchoolRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('school.edit');
+        return $this->user()?->hasPermission('school.edit') ?? false;
     }
 
     public function rules(): array

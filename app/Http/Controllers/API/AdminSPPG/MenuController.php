@@ -8,15 +8,27 @@ use App\Http\Resources\MenuResource;
 use App\Services\SPPG\MenuService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
 /**
  * CONTROLLER untuk Fitur Perencanaan Menu.
  */
-class MenuController extends Controller
+class MenuController extends Controller implements HasMiddleware
 {
     public function __construct(
         private readonly MenuService $menuService
     ) {}
+
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:menus.read', only: ['index', 'show', 'showGrouped']),
+            new Middleware('permission:menus.create', only: ['store']),
+            new Middleware('permission:menus.update', only: ['update', 'publish', 'refreshStatuses']),
+            new Middleware('permission:menus.delete', only: ['destroy']),
+        ];
+    }
 
     // =============================================
     // GET /api/menus

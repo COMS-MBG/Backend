@@ -11,35 +11,35 @@ class SPPGResource extends JsonResource
     {
         return [
             'id'          => $this->id,
-            'nama'        => $this->nama,
-            'alamat'      => $this->alamat,
-            'koordinat'   => [
+            'name'        => $this->name,
+            'address'     => $this->address,
+            'coordinates' => [
                 'lat' => (float) $this->latitude,
                 'lng' => (float) $this->longitude,
             ],
-            'kapasitas'   => $this->kapasitas,
+            'capacity'    => $this->capacity,
             'status'      => $this->status,
-            'telepon'     => $this->telepon,
+            'phone'       => $this->phone,
             'email'       => $this->email,
-            'wilayah'     => [
-                'kecamatan' => $this->kecamatan,
-                'kota'      => $this->kota,
-                'provinsi'  => $this->provinsi,
+            'region'      => [
+                'district' => $this->district,
+                'city'     => $this->city,
+                'province' => $this->province,
             ],
-            'pemilik'     => $this->whenLoaded('pemilik', fn() => [
-                'id'   => $this->pemilik?->id,
-                'nama' => $this->pemilik?->nama,
+            'owner'       => $this->whenLoaded('owner', fn() => [
+                'id'   => $this->owner?->id,
+                'name' => $this->owner?->name,
             ]),
-            'sekolah_count'   => $this->whenCounted('schools'),
-            'sekolah'         => SchoolResource::collection($this->whenLoaded('schools')),
-            'kapasitas_status' => $this->when(
+            'schools_count'    => $this->whenCounted('schools'),
+            'schools'          => SchoolResource::collection($this->whenLoaded('schools')),
+            'capacity_status'  => $this->when(
                 isset($this->schools_count),
                 fn() => [
-                    'terisi'     => $this->schools_count ?? 0,
-                    'persentase' => $this->kapasitas > 0
-                        ? round((($this->schools_count ?? 0) / $this->kapasitas) * 100, 1)
+                    'filled'     => $this->schools_count ?? 0,
+                    'percentage' => $this->capacity > 0
+                        ? round((($this->schools_count ?? 0) / $this->capacity) * 100, 1)
                         : 0,
-                    'penuh'      => ($this->schools_count ?? 0) >= $this->kapasitas,
+                    'full'       => ($this->schools_count ?? 0) >= $this->capacity,
                 ]
             ),
             'created_at'  => $this->created_at?->toISOString(),

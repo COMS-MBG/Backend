@@ -62,8 +62,10 @@ Route::middleware(['auth:sanctum'])
     });
 
     Route::apiResource('distributions', DistributionController::class);
-    Route::post('tracking/update-location', [CourierTrackingController::class, 'updateLocation']);
+    Route::post('tracking/update-location', [CourierTrackingController::class, 'updateLocation'])
+        ->middleware('permission:distribution.update');
     Route::apiResource('financial-reports', FinancialReportController::class);
-    Route::get('maps/distribution', [DistributionMapController::class, 'index']);
+    Route::get('maps/distribution', [DistributionMapController::class, 'index'])
+        ->middleware('permission:distribution.read');
 
 });

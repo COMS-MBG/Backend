@@ -9,7 +9,7 @@ class UpdateEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('employee.edit');
+        return $this->user()?->hasPermission('employee.edit') ?? false;
     }
 
     public function rules(): array
@@ -17,23 +17,24 @@ class UpdateEmployeeRequest extends FormRequest
         $employeeId = $this->route('employee');
 
         return [
-            'nama'              => 'sometimes|string|max:255',
-            'nik'               => "nullable|string|size:16|unique:employees,nik,{$employeeId}",
-            'jabatan'           => 'sometimes|in:' . implode(',', Employee::ROLES),
-            'telepon'           => 'nullable|string|max:20',
-            'alamat'            => 'nullable|string',
-            'tanggal_bergabung' => 'nullable|date',
-            'gaji_pokok'        => 'nullable|numeric|min:0',
-            'status'            => 'sometimes|in:aktif,nonaktif,cuti',
-            'foto'              => 'nullable|image|max:2048',
-            'role_id'           => 'nullable|exists:roles,id', // ← tambahan baru
+            'name'        => 'sometimes|string|max:255',
+            'nik'         => "nullable|string|size:16|unique:employees,nik,{$employeeId}",
+            'position'    => 'sometimes|in:' . implode(',', Employee::POSITIONS),
+            'phone'       => 'nullable|string|max:20',
+            'address'     => 'nullable|string',
+            'joined_at'   => 'nullable|date',
+            'base_salary' => 'nullable|numeric|min:0',
+            'status'      => 'sometimes|in:active,inactive',
+            'photo'       => 'nullable|image|max:2048',
+            'role_id'     => 'nullable|exists:roles,id',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'role_id.exists' => 'Role yang dipilih tidak ditemukan.',
+            'role_id.exists'   => 'Role yang dipilih tidak ditemukan.',
+            'position.in'      => 'Posisi yang dipilih tidak valid.',
         ];
     }
 }

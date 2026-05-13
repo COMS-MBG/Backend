@@ -2,10 +2,12 @@
 
 namespace App\Models;
 
+use App\Models\SPPG;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Support\Str;
+
 
 class Role extends Model
 {
@@ -15,50 +17,72 @@ class Role extends Model
         'name',
         'slug',
         'description',
+        'sppg_id',
     ];
 
-    // ─── Auto-generate slug from name ────────────────────────────────────────
+    // ── Auto slug ─────────────────────────────────────────────────────────────
+
     protected static function booted(): void
     {
         static::creating(function (Role $role) {
-            $role->slug = Str::slug($role->name);
+            $role->slug ??= Str::slug($role->name);
         });
 
         static::updating(function (Role $role) {
-            if ($role->isDirty('name')) {
+            if ($role->isDirty('name') && !$role->isDirty('slug')) {
                 $role->slug = Str::slug($role->name);
             }
         });
     }
 
-    // ─── Relationships ────────────────────────────────────────────────────────
+    // ── Relationships ─────────────────────────────────────────────────────────
 
-    /** A role can have many permissions (many-to-many) */
     public function permissions()
     {
         return $this->belongsToMany(Permission::class, 'role_permission');
     }
 
-    /** A role can be assigned to many employees */
     public function employees()
     {
         return $this->hasMany(Employee::class);
     }
 
-    // ─── Helpers ─────────────────────────────────────────────────────────────
+    public function sppg()
+    {
+        return $this->belongsTo(SPPG::class, 'sppg_id');
+    }
 
-    /** Check if this role has a specific permission slug */
+    // ── Helpers ───────────────────────────────────────────────────────────────
+
     public function hasPermission(string $slug): bool
     {
+        if (!$this->relationLoaded('permissions')) {
+            $this->load('permissions');
+        }
+
         return $this->permissions->contains('slug', $slug);
     }
 
-    /** Group permissions by module+feature for easy display */
+    /**
+     * Global role = belongs to super_admin, not tied to any SPPG.
+     */
+    public function isGlobal(): bool
+    {
+        return $this->sppg_id === null;
+    }
+
+    /**
+     * For the role & permission management page.
+     * Output: ['distribution' => ['delivery_schedule' => ['read', 'create']]]
+     */
     public function permissionsGrouped(): array
     {
         return $this->permissions
-            ->groupBy('feature')
-            ->map(fn ($perms) => $perms->pluck('action')->toArray())
+            ->groupBy('module')
+            ->map(fn($byModule) => $byModule
+                ->groupBy('feature')
+                ->map(fn($byFeature) => $byFeature->pluck('action')->toArray())
+            )
             ->toArray();
     }
 }

@@ -11,25 +11,25 @@ class SPPGService
 {
     public function getAll(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = SPPG::with(['pemilik', 'schools'])
+        $query = SPPG::with(['owner', 'schools'])
             ->withCount('schools');
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
-        if (!empty($filters['kota'])) {
-            $query->where('kota', 'ilike', "%{$filters['kota']}%");
+        if (!empty($filters['city'])) {
+            $query->where('city', 'ilike', "%{$filters['city']}%");
         }
         if (!empty($filters['search'])) {
-            $query->where('nama', 'ilike', "%{$filters['search']}%");
+            $query->where('name', 'ilike', "%{$filters['search']}%");
         }
 
-        return $query->orderBy('nama')->paginate($perPage);
+        return $query->orderBy('name')->paginate($perPage);
     }
 
     public function findById(string $id): SPPG
     {
-        return SPPG::with(['pemilik', 'schools', 'employees'])->findOrFail($id);
+        return SPPG::with(['owner', 'schools', 'employees'])->findOrFail($id);
     }
 
     public function create(array $data): SPPG
@@ -41,14 +41,15 @@ class SPPGService
             if (!empty($data['school_ids'])) {
                 foreach ($data['school_ids'] as $schoolId) {
                     School::where('id', $schoolId)->update(['sppg_id' => $sppg->id]);
-                    $sppg->schools()->attach($schoolId, [
-                        'tanggal_bergabung' => now(),
-                        'status'            => 'aktif',
-                    ]);
+                    // TODO: sppg_schools pivot — cek migration sebelum uncomment
+                    // $sppg->schools()->attach($schoolId, [
+                    //     'joined_at' => now(),
+                    //     'status'    => 'active',
+                    // ]);
                 }
             }
 
-            return $sppg->fresh(['pemilik', 'schools']);
+            return $sppg->fresh(['owner', 'schools']);
         });
     }
 
@@ -56,7 +57,7 @@ class SPPGService
     {
         $sppg = SPPG::findOrFail($id);
         $sppg->update($data);
-        return $sppg->fresh(['pemilik', 'schools']);
+        return $sppg->fresh(['owner', 'schools']);
     }
 
     public function delete(string $id): void
@@ -104,12 +105,12 @@ class SPPGService
     {
         return [
             'total'      => SPPG::count(),
-            'aktif'      => SPPG::where('status', 'aktif')->count(),
-            'nonaktif'   => SPPG::where('status', 'nonaktif')->count(),
-            'pengajuan'  => SPPG::where('status', 'pengajuan')->count(),
+            'active'     => SPPG::where('status', 'active')->count(),
+            'inactive'   => SPPG::where('status', 'inactive')->count(),
+            'pending'    => SPPG::where('status', 'pending')->count(),
             'overcapacity' => SPPG::withCount('schools')
                 ->get()
-                ->filter(fn($s) => $s->schools_count >= $s->kapasitas)
+                ->filter(fn($s) => $s->schools_count >= $s->capacity)
                 ->count(),
         ];
     }

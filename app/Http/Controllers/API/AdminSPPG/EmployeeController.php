@@ -18,15 +18,15 @@ class EmployeeController extends Controller
         $query = Employee::with('role')->latest();
 
         if ($request->filled('search')) {
-            $query->where('nama', 'like', '%' . $request->search . '%');
+            $query->where('name', 'like', '%' . $request->search . '%');
         }
 
         if ($request->filled('role_id')) {
             $query->where('role_id', $request->role_id);
         }
 
-        if ($request->filled('jabatan')) {
-            $query->where('jabatan', $request->jabatan);
+        if ($request->filled('position')) {
+            $query->where('position', $request->position);
         }
 
         return response()->json($query->paginate(10));

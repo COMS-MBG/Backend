@@ -10,26 +10,31 @@ class EmployeeResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'                => $this->id,
-            'nama'              => $this->nama,
-            'nik'               => $this->nik,
-            'jabatan'           => $this->jabatan,
-            'telepon'           => $this->telepon,
-            'alamat'            => $this->alamat,
-            'tanggal_bergabung' => $this->tanggal_bergabung?->toDateString(),
-            'status'            => $this->status,
-            'foto'              => $this->foto ? asset('storage/' . $this->foto) : null,
-            'sppg_id'           => $this->sppg_id,
-            'user'              => $this->whenLoaded('user', fn() => [
+            'id'          => $this->id,
+            'name'        => $this->name,
+            'nik'         => $this->nik,
+            'position'    => $this->position,
+            'phone'       => $this->phone,
+            'address'     => $this->address,
+            'joined_at'   => $this->joined_at?->toDateString(),
+            'status'      => $this->status,
+            'photo'       => $this->photo ? asset('storage/' . $this->photo) : null,
+            'sppg_id'     => $this->sppg_id,
+            'has_account' => $this->user_id !== null,
+            'user'        => $this->whenLoaded('user', fn() => [
                 'id'    => $this->user?->id,
-                'nama'  => $this->user?->nama,
+                'name'  => $this->user?->name,
                 'email' => $this->user?->email,
-                'roles' => $this->user?->getRoleNames(),
+            ]),
+            'role'        => $this->whenLoaded('role', fn() => [
+                'id'   => $this->role?->id,
+                'name' => $this->role?->name,
+                'slug' => $this->role?->slug,
             ]),
             // Gaji hanya terlihat oleh pemilik/manajer/super_admin
-            'gaji_pokok' => $this->when(
+            'base_salary' => $this->when(
                 $request->user()?->hasAnyRole(['super_admin', 'pemilik', 'manajer']),
-                $this->gaji_pokok
+                $this->base_salary
             ),
             'created_at'  => $this->created_at?->toISOString(),
             'updated_at'  => $this->updated_at?->toISOString(),

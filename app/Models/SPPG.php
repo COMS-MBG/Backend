@@ -13,29 +13,29 @@ class SPPG extends Model
     protected $table = 's_p_p_g_s';
 
     protected $fillable = [
-        'nama',
-        'alamat',
+        'name',
+        'address',
+        'district',
+        'city',
+        'province',
         'latitude',
         'longitude',
-        'kapasitas',
+        'capacity',
+        'phone',
+        'email',
         'status',
         'pemilik_id',
-        'telepon',
-        'email',
-        'kecamatan',
-        'kota',
-        'provinsi',
     ];
 
     protected $casts = [
-        'latitude'  => 'float',
+        'latitude' => 'float',
         'longitude' => 'float',
-        'kapasitas' => 'integer',
+        'capacity' => 'integer',
     ];
 
-    // ─── Relasi ────────────────────────────────────────────────────────────────
+    // ── Relations ─────────────────────────────────────────────────────────────
 
-    public function pemilik()
+    public function owner()
     {
         return $this->belongsTo(User::class, 'pemilik_id');
     }
@@ -50,11 +50,16 @@ class SPPG extends Model
         return $this->hasMany(Employee::class, 'sppg_id');
     }
 
-    // ─── Scopes ────────────────────────────────────────────────────────────────
+    public function roles()
+    {
+        return $this->hasMany(Role::class, 'sppg_id');
+    }
+
+    // ── Scopes ────────────────────────────────────────────────────────────────
 
     public function scopeActive($query)
     {
-        return $query->where('status', 'aktif');
+        return $query->where('status', 'active');
     }
 
     public function scopeNearby($query, float $lat, float $lng, float $radiusKm = 10)
@@ -67,11 +72,11 @@ class SPPG extends Model
                 + sin(radians(?)) * sin(radians(latitude))
             )) AS distance_km
         ", [$lat, $lng, $lat])
-        ->having('distance_km', '<=', $radiusKm)
-        ->orderBy('distance_km');
+            ->having('distance_km', '<=', $radiusKm)
+            ->orderBy('distance_km');
     }
 
-    // ─── Accessors ─────────────────────────────────────────────────────────────
+    // ── Accessors ─────────────────────────────────────────────────────────────
 
     public function getCoordinatesAttribute(): array
     {
@@ -80,6 +85,6 @@ class SPPG extends Model
 
     public function getIsOvercapacityAttribute(): bool
     {
-        return $this->schools()->count() >= $this->kapasitas;
+        return $this->schools()->count() >= $this->capacity;
     }
 }

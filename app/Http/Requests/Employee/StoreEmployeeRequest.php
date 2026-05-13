@@ -9,31 +9,33 @@ class StoreEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('employee.create');
+        return $this->user()?->hasPermission('employee.create') ?? false;
     }
 
     public function rules(): array
     {
         return [
-            'nama'              => 'required|string|max:255',
-            'email'             => 'required|email|unique:users,email',
-            'password'          => 'nullable|string|min:8',
-            'nik'               => 'nullable|string|size:16|unique:employees,nik',
-            'jabatan'           => 'required|in:' . implode(',', Employee::ROLES),
-            'telepon'           => 'nullable|string|max:20',
-            'alamat'            => 'nullable|string',
-            'tanggal_bergabung' => 'nullable|date',
-            'gaji_pokok'        => 'nullable|numeric|min:0',
-            'status'            => 'sometimes|in:aktif,nonaktif,cuti',
-            'foto'              => 'nullable|image|max:2048',
-            'role_id'           => 'nullable|exists:roles,id', // ← tambahan baru
+            'name'        => 'required|string|max:255',
+            'email'       => 'nullable|email|unique:users,email',
+            'password'    => 'nullable|string|min:8',
+            'nik'         => 'nullable|string|size:16|unique:employees,nik',
+            'position'    => 'required|in:' . implode(',', Employee::POSITIONS),
+            'phone'       => 'nullable|string|max:20',
+            'address'     => 'nullable|string',
+            'joined_at'   => 'nullable|date',
+            'base_salary' => 'nullable|numeric|min:0',
+            'status'      => 'sometimes|in:active,inactive',
+            'photo'       => 'nullable|image|max:2048',
+            'role_id'     => 'nullable|exists:roles,id',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'role_id.exists' => 'Role yang dipilih tidak ditemukan.',
+            'role_id.exists'   => 'Role yang dipilih tidak ditemukan.',
+            'position.in'      => 'Posisi yang dipilih tidak valid.',
+            'email.unique'     => 'Email sudah digunakan.',
         ];
     }
 }

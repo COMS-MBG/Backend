@@ -1,60 +1,81 @@
 <?php
+
 namespace App\Services\Employee;
 
 use App\Models\Employee;
 use App\Models\User;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Hash;
 
 class EmployeeService
 {
     public function getAll(string $sppgId, array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = Employee::with('user')
+        $query = Employee::with(['user', 'role'])
             ->where('sppg_id', $sppgId);
 
-        if (!empty($filters['jabatan'])) {
-            $query->where('jabatan', $filters['jabatan']);
+        if (!empty($filters['position'])) {
+            $query->where('position', $filters['position']);
         }
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
         if (!empty($filters['search'])) {
-            $query->where('nama', 'ilike', "%{$filters['search']}%");
+            $query->where('name', 'ilike', "%{$filters['search']}%");
         }
 
-        return $query->orderBy('nama')->paginate($perPage);
+        return $query->orderBy('name')->paginate($perPage);
     }
 
     public function findById(string $id, string $sppgId): Employee
     {
-        return Employee::with('user')
+        return Employee::with(['user', 'role'])
             ->where('sppg_id', $sppgId)
             ->findOrFail($id);
     }
 
+    /**
+     * Buat employee baru.
+     *
+     * Tidak semua employee perlu akun (user_id nullable).
+     * Akun hanya dibuat jika field 'email' dikirim.
+     * Role RBAC di-set via 'role_id' pada employees, bukan di users.
+     */
     public function create(array $data, string $sppgId): Employee
     {
         return DB::transaction(function () use ($data, $sppgId) {
-            // Buat akun user untuk karyawan
-            $user = User::create([
-                'nama'     => $data['nama'],
-                'email'    => $data['email'],
-                'password' => Hash::make($data['password'] ?? 'sppg@123'),
-                'sppg_id'  => $sppgId,
+            $userId = null;
+
+            // Buat akun user HANYA jika email dikirim
+            if (!empty($data['email'])) {
+                $user = User::create([
+                    'name'      => $data['name'],
+                    'email'     => $data['email'],
+                    'password'  => $data['password'] ?? 'sppg@123',
+                    'phone'     => $data['phone'] ?? null,
+                    'role_type' => 'sppg_user',
+                    'sppg_id'   => $sppgId,
+                ]);
+                $userId = $user->id;
+            }
+
+            // Buat employee record — role_id langsung di employee
+            $employee = Employee::create([
+                'sppg_id'     => $sppgId,
+                'user_id'     => $userId,
+                'role_id'     => $data['role_id'] ?? null,
+                'name'        => $data['name'],
+                'nik'         => $data['nik'] ?? null,
+                'position'    => $data['position'] ?? null,
+                'phone'       => $data['phone'] ?? null,
+                'address'     => $data['address'] ?? null,
+                'photo'       => $data['photo'] ?? null,
+                'joined_at'   => $data['joined_at'] ?? null,
+                'base_salary' => $data['base_salary'] ?? null,
+                'status'      => $data['status'] ?? 'active',
             ]);
 
-            // Assign role Spatie sesuai jabatan
-            $user->assignRole($this->mapJabatanToRole($data['jabatan']));
-
-            // Buat employee record
-            $employee = Employee::create(array_merge(
-                $data,
-                ['user_id' => $user->id, 'sppg_id' => $sppgId]
-            ));
-
-            return $employee->fresh('user');
+            return $employee->fresh(['user', 'role']);
         });
     }
 
@@ -64,12 +85,7 @@ class EmployeeService
             $employee = $this->findById($id, $sppgId);
             $employee->update($data);
 
-            // Update role jika jabatan berubah
-            if (!empty($data['jabatan']) && $employee->user) {
-                $employee->user->syncRoles([$this->mapJabatanToRole($data['jabatan'])]);
-            }
-
-            return $employee->fresh('user');
+            return $employee->fresh(['user', 'role']);
         });
     }
 
@@ -85,18 +101,5 @@ class EmployeeService
 
             $employee->delete();
         });
-    }
-
-    private function mapJabatanToRole(string $jabatan): string
-    {
-        return match ($jabatan) {
-            'pemilik'              => 'pemilik',
-            'manajer'              => 'manajer',
-            'ahli_gizi'            => 'ahli_gizi',
-            'admin_logistik'       => 'admin_logistik',
-            'kurir'                => 'kurir',
-            'karyawan_operasional' => 'karyawan_operasional',
-            default                => 'karyawan_operasional',
-        };
     }
 }

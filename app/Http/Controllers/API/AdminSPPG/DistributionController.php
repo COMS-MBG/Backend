@@ -4,9 +4,20 @@ namespace App\Http\Controllers\API\AdminSPPG;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class DistributionController extends Controller
+class DistributionController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:distribution.read', only: ['index', 'show']),
+            new Middleware('permission:distribution.create', only: ['store']),
+            new Middleware('permission:distribution.update', only: ['update']),
+            new Middleware('permission:distribution.delete', only: ['destroy']),
+        ];
+    }
     /**
      * Display a listing of the resource.
      */

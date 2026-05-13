@@ -58,4 +58,26 @@ class RecipeRequest extends FormRequest
             ], 422)
         );
     }
+
+    public function withValidator(Validator $validator)
+    {
+        $validator->after(function ($validator) {
+            $ingredients = $this->input('ingredients', []);
+            if (!is_array($ingredients) || empty($ingredients)) return;
+
+            $totalCalorie = 0;
+            foreach ($ingredients as $item) {
+                if (empty($item['ingredient_id']) || empty($item['weight_used'])) continue;
+                $ingredient = \App\Models\Ingredient::find($item['ingredient_id']);
+                if ($ingredient) {
+                    $nutrition = $ingredient->calculateNutritionFor($item['weight_used']);
+                    $totalCalorie += $nutrition['calorie'];
+                }
+            }
+
+            if ($totalCalorie < 2000 || $totalCalorie > 2700) {
+                $validator->errors()->add('ingredients', 'Total kalori belum memenuhi target. Tambahkan menu atau sesuaikan berat bahan baku. (Total: ' . round($totalCalorie, 2) . ' kkal, Target: 2000-2700 kkal)');
+            }
+        });
+    }
 }

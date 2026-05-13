@@ -17,23 +17,20 @@ class Permission extends Model
         'action',
     ];
 
-    // ─── Relationships ────────────────────────────────────────────────────────
+    // ── Relationships ─────────────────────────────────────────────────────────
 
-    /** A permission can belong to many roles */
     public function roles()
     {
         return $this->belongsToMany(Role::class, 'role_permission');
     }
 
-    // ─── Scopes ───────────────────────────────────────────────────────────────
+    // ── Scopes ────────────────────────────────────────────────────────────────
 
-    /** Filter by module */
     public function scopeByModule($query, string $module)
     {
         return $query->where('module', $module);
     }
 
-    /** Filter by feature */
     public function scopeByFeature($query, string $feature)
     {
         return $query->where('feature', $feature);

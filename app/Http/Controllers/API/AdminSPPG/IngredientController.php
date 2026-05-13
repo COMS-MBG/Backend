@@ -8,6 +8,8 @@ use App\Http\Resources\IngredientResource;
 use App\Services\SPPG\IngredientService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request; 
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
 /**
  * CONTROLLER untuk Fitur Master Data Bahan Baku (Ingredient).
@@ -20,12 +22,22 @@ use Illuminate\Http\Request;
  *
  * SEMUA LOGIKA BISNIS ada di IngredientService, bukan di sini.
  */
-class IngredientController extends Controller
+class IngredientController extends Controller implements HasMiddleware
 {
     public function __construct(
         private readonly IngredientService $ingredientService
         // Analogi NestJS: constructor(private ingredientService: IngredientService) {}
     ) {}
+
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:ingredients.read', only: ['index', 'show', 'dropdown', 'calculateNutrition']),
+            new Middleware('permission:ingredients.create', only: ['store']),
+            new Middleware('permission:ingredients.update', only: ['update']),
+            new Middleware('permission:ingredients.delete', only: ['destroy']),
+        ];
+    }
 
     // =============================================
     // GET /api/ingredients

@@ -4,9 +4,20 @@ namespace App\Http\Controllers\API\AdminSPPG;
 
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
-class FinancialReportController extends Controller
+class FinancialReportController extends Controller implements HasMiddleware
 {
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:finance.read', only: ['index', 'show']),
+            new Middleware('permission:finance.create', only: ['store']),
+            new Middleware('permission:finance.update', only: ['update']),
+            new Middleware('permission:finance.delete', only: ['destroy']),
+        ];
+    }
     /**
      * Display a listing of the resource.
      */

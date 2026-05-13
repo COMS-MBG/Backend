@@ -8,16 +8,28 @@ use App\Http\Resources\RecipeResource;
 use App\Services\SPPG\RecipeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Routing\Controllers\HasMiddleware;
+use Illuminate\Routing\Controllers\Middleware;
 
 /**
  * CONTROLLER untuk Fitur Master Resep.
  * Endpoint CRUD + dropdown untuk dipakai di Perencanaan Menu.
  */
-class RecipeController extends Controller
+class RecipeController extends Controller implements HasMiddleware
 {
     public function __construct(
         private readonly RecipeService $recipeService
     ) {}
+
+    public static function middleware(): array
+    {
+        return [
+            new Middleware('permission:recipes.read', only: ['index', 'show', 'dropdown']),
+            new Middleware('permission:recipes.create', only: ['store']),
+            new Middleware('permission:recipes.update', only: ['update']),
+            new Middleware('permission:recipes.delete', only: ['destroy']),
+        ];
+    }
 
     // =============================================
     // GET /api/recipes

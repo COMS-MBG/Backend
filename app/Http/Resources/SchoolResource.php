@@ -28,7 +28,7 @@ class SchoolResource extends JsonResource
             'sppg_id'         => $this->sppg_id,
             'sppg'            => $this->whenLoaded('sppg', fn() => [
                 'id'   => $this->sppg?->id,
-                'nama' => $this->sppg?->nama,
+                'nama' => $this->sppg?->name,
             ]),
             'jarak_ke_sppg_km' => $this->when(
                 $this->relationLoaded('sppg') && $this->sppg,

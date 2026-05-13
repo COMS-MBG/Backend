@@ -8,7 +8,7 @@ class StoreSchoolRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()->can('school.create');
+        return $this->user()?->hasPermission('school.create') ?? false;
     }
 
     public function rules(): array
