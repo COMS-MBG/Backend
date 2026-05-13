@@ -18,7 +18,7 @@ use App\Http\Controllers\API\Auth\AuthenticatedUserController;
 |
 */
 
-Route::prefix('auth')->group(function () {
+Route::prefix('auth')->middleware('web')->group(function () {
 
     // Public — no auth required
     Route::post('/login', LoginController::class);
