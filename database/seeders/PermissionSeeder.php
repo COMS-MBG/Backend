@@ -3,21 +3,16 @@
 namespace Database\Seeders;
 
 use App\Models\Permission;
-use App\Models\Role;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Str;
 
 class PermissionSeeder extends Seeder
 {
-    /**
-     * Seed permissions sesuai modul aplikasi.
-     *
-     * Format slug: "module.action"
-     * Contoh: "employee.create", "nutrition.read"
-     */
     public function run(): void
     {
         $permissions = [
+            // Dashboard
+            ['module' => 'dashboard',     'feature' => 'dashboard',     'action' => 'read'],
+
             // Employee
             ['module' => 'employee',     'feature' => 'employee',     'action' => 'create'],
             ['module' => 'employee',     'feature' => 'employee',     'action' => 'read'],
@@ -35,6 +30,12 @@ class PermissionSeeder extends Seeder
             ['module' => 'sppg',         'feature' => 'sppg',         'action' => 'read'],
             ['module' => 'sppg',         'feature' => 'sppg',         'action' => 'update'],
             ['module' => 'sppg',         'feature' => 'sppg',         'action' => 'delete'],
+
+            // Nutrition — Module-level
+            ['module' => 'nutrition',    'feature' => 'nutrition',    'action' => 'create'],
+            ['module' => 'nutrition',    'feature' => 'nutrition',    'action' => 'read'],
+            ['module' => 'nutrition',    'feature' => 'nutrition',    'action' => 'update'],
+            ['module' => 'nutrition',    'feature' => 'nutrition',    'action' => 'delete'],
 
             // Nutrition — Ingredients
             ['module' => 'nutrition',    'feature' => 'ingredients',  'action' => 'create'],
@@ -65,11 +66,22 @@ class PermissionSeeder extends Seeder
             ['module' => 'finance',      'feature' => 'finance',      'action' => 'read'],
             ['module' => 'finance',      'feature' => 'finance',      'action' => 'update'],
             ['module' => 'finance',      'feature' => 'finance',      'action' => 'delete'],
+
+            // Partner
+            ['module' => 'partner',      'feature' => 'partner',      'action' => 'create'],
+            ['module' => 'partner',      'feature' => 'partner',      'action' => 'read'],
+            ['module' => 'partner',      'feature' => 'partner',      'action' => 'update'],
+            ['module' => 'partner',      'feature' => 'partner',      'action' => 'delete'],
+
+            // Report
+            ['module' => 'report',       'feature' => 'report',       'action' => 'create'],
+            ['module' => 'report',       'feature' => 'report',       'action' => 'read'],
+            ['module' => 'report',       'feature' => 'report',       'action' => 'update'],
+            ['module' => 'report',       'feature' => 'report',       'action' => 'delete'],
         ];
 
         foreach ($permissions as $p) {
             $slug = "{$p['module']}.{$p['action']}";
-            // Jika ada feature berbeda di module yang sama, tambahkan feature ke slug
             if ($p['feature'] !== $p['module']) {
                 $slug = "{$p['feature']}.{$p['action']}";
             }
