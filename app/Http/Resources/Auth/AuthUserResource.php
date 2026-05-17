@@ -7,16 +7,6 @@ use Illuminate\Http\Resources\Json\JsonResource;
 
 class AuthUserResource extends JsonResource
 {
-    /**
-     * Transform the user model into the API response.
-     *
-     * RBAC Architecture:
-     * - role_type (users)      → gate kasar: super_admin / sppg_user
-     * - role_id   (employees)  → gate detail: permissions via role → role_permission → permissions
-     *
-     * Permission format: flat slugs → "{module}.{action}"
-     * Example: ["employee.create", "employee.read", "nutrition.read"]
-     */
     public function toArray(Request $request): array
     {
         $this->resource->loadMissing([
@@ -32,7 +22,7 @@ class AuthUserResource extends JsonResource
             'profile_picture' => $this->profile_picture,
             'is_active'       => $this->is_active,
             'role_type'       => $this->role_type,
-            'role_name'       => $this->employee?->role?->name ?? 'Tanpa Akses',
+            'role_name'       => $this->role_name,
             'sppg'            => $this->sppg ? [
                 'id'     => $this->sppg->id,
                 'name'   => $this->sppg->name,
@@ -41,16 +31,8 @@ class AuthUserResource extends JsonResource
             'permissions'     => $this->resolvePermissions(),
         ];
     }
-
-    /**
-     * Resolve permissions berdasarkan role_type.
-     *
-     * super_admin → skip RBAC tabel, hardcode read-only (untuk next development)
-     * sppg_user   → ambil dari employees → role → permissions (dynamic, realtime)
-     */
     private function resolvePermissions(): array
     {
-        // sppg_user → dynamic via RBAC tabel
         if ($this->role_type === 'sppg_user') {
             return $this->employee?->role?->permissions
                 ?->pluck('slug')

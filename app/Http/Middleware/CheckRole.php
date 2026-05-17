@@ -27,7 +27,15 @@ class CheckRole
             ], 401);
         }
 
-        if ($request->user()->hasAnyRole($roles)) {
+        // Normalize pipe-separated roles: 'pemilik|manajer|admin-sppg' → ['pemilik','manajer','admin-sppg']
+        $normalized = [];
+        foreach ($roles as $r) {
+            foreach (explode('|', $r) as $s) {
+                $normalized[] = trim($s);
+            }
+        }
+
+        if ($request->user()->hasAnyRole($normalized)) {
             return $next($request);
         }
 
