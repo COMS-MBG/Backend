@@ -43,7 +43,12 @@ class EmployeeController extends Controller
 
     public function store(StoreEmployeeRequest $request)
     {
-        $employee = Employee::create($request->validated());
+        $data = $request->validated();
+        $data['sppg_id'] = $request->user()->sppg_id
+            ?? $request->user()->employee?->sppg_id
+            ?? 1;
+
+        $employee = Employee::create($data);
 
         return response()->json([
             'message'  => 'Employee created successfully.',
@@ -63,7 +68,7 @@ class EmployeeController extends Controller
 
     public function destroy(Employee $employee)
     {
-        $employee->delete();
+        $employee->deleteOrFail();
 
         return response()->json([
             'message' => 'Employee deleted successfully.',
@@ -76,7 +81,7 @@ class EmployeeController extends Controller
     {
         return response()->json([
             'employee' => $employee->load('role'),
-            'roles'    => Role::orderBy('name')->get(),
+            'roles'    => Role::orderBy('name', 'asc')->get(),
         ]);
     }
 

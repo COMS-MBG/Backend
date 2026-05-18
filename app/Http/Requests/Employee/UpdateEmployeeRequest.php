@@ -9,12 +9,13 @@ class UpdateEmployeeRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission('employee.edit') ?? false;
+        return $this->user()?->hasPermission('employee.update') ?? false;
     }
 
     public function rules(): array
     {
-        $employeeId = $this->route('employee');
+        $employee = $this->route('employee');
+        $employeeId = $employee instanceof Employee ? $employee->id : $employee;
 
         return [
             'name'        => 'sometimes|string|max:255',
