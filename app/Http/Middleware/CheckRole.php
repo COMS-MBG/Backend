@@ -27,6 +27,11 @@ class CheckRole
             ], 401);
         }
 
+        // Super admin bypass semua role gate
+        if ($request->user()->isSuperAdmin()) {
+            return $next($request);
+        }
+
         // Normalize pipe-separated roles: 'pemilik|manajer|admin-sppg' → ['pemilik','manajer','admin-sppg']
         $normalized = [];
         foreach ($roles as $r) {

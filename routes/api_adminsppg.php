@@ -52,23 +52,23 @@ Route::middleware(['auth:sanctum'])
         // RBAC Management
         Route::apiResource('roles', RoleController::class);
         Route::get('permissions', [PermissionController::class, 'index']);
-
-        // ── Partner Management ────────────────────────────────────────────
-        Route::get('partners/summary', [PartnerController::class, 'summary'])
-            ->middleware('permission:partner.read');
-        Route::post('partners/import', [PartnerController::class, 'import'])
-            ->middleware('permission:partner.create');
-        Route::middleware('permission:partner.read')->group(function () {
-            Route::get('partners', [PartnerController::class, 'index']);
-            Route::get('partners/{partner}', [PartnerController::class, 'show']);
-        });
-        Route::post('partners', [PartnerController::class, 'store'])
-            ->middleware('permission:partner.create');
-        Route::match(['put', 'patch'], 'partners/{partner}', [PartnerController::class, 'update'])
-            ->middleware('permission:partner.update');
-        Route::delete('partners/{partner}', [PartnerController::class, 'destroy'])
-            ->middleware('permission:partner.delete');
     });
+
+    // ── Partner Management (diluar role gate — akses dikontrol per-permission) ─
+    Route::get('partners/summary', [PartnerController::class, 'summary'])
+        ->middleware('permission:partner.read');
+    Route::post('partners/import', [PartnerController::class, 'import'])
+        ->middleware('permission:partner.create');
+    Route::middleware('permission:partner.read')->group(function () {
+        Route::get('partners', [PartnerController::class, 'index']);
+        Route::get('partners/{partner}', [PartnerController::class, 'show']);
+    });
+    Route::post('partners', [PartnerController::class, 'store'])
+        ->middleware('permission:partner.create');
+    Route::match(['put', 'patch'], 'partners/{partner}', [PartnerController::class, 'update'])
+        ->middleware('permission:partner.update');
+    Route::delete('partners/{partner}', [PartnerController::class, 'destroy'])
+        ->middleware('permission:partner.delete');
 
     // ── Manajemen Gizi ────────────────────────────────────────────────────────
     Route::prefix('nutrition')->group(function () {
