@@ -13,6 +13,11 @@ return new class extends Migration
     {
         Schema::create('feedback', function (Blueprint $table) {
             $table->id();
+            $table->string('name');                       // Nama pemberi ulasan
+            $table->string('role')->nullable();           // Peran: Wali Murid, dll
+            $table->text('message');                      // Isi ulasan
+            $table->unsignedTinyInteger('rating')->default(5); // Skor 1-5
+            $table->boolean('is_approved')->default(false); // Status moderasi
             $table->timestamps();
         });
     }
