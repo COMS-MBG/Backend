@@ -26,6 +26,8 @@ class DatabaseSeeder extends Seeder
             SPPGSeeder::class,
             UserSeeder::class,
             PartnerSeeder::class,
+            IngredientSeeder::class,
+            RecipeSeeder::class,
         ]);
     }
 }
