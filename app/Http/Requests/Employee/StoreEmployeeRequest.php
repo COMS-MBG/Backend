@@ -24,7 +24,7 @@ class StoreEmployeeRequest extends FormRequest
             'address'     => 'nullable|string',
             'joined_at'   => 'nullable|date',
             'base_salary' => 'nullable|numeric|min:0',
-            'status'      => 'sometimes|in:active,inactive',
+            //'status'      => 'sometimes|in:active,inactive',
             'photo'       => 'nullable|image|max:2048',
             'role_id'     => 'nullable|exists:roles,id',
         ];

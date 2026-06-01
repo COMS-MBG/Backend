@@ -37,7 +37,7 @@ class Employee extends Model
         'photo',
         'joined_at',
         'base_salary',
-        'status',
+        //'status',
     ];
 
     protected $casts = [

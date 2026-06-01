@@ -47,7 +47,6 @@ class EmployeeController extends Controller
         $data['sppg_id'] = $request->user()->sppg_id
             ?? $request->user()->employee?->sppg_id
             ?? 1;
-
         $employee = Employee::create($data);
 
         return response()->json([
