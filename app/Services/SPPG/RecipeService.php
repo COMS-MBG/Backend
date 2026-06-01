@@ -38,7 +38,7 @@ class RecipeService
      */
     public function getAllForDropdown()
     {
-        return Recipe::select('id', 'name', 'total_calorie', 'total_protein', 'total_weight')
+        return Recipe::select('id', 'name', 'total_calorie', 'total_protein', 'total_carbohydrate', 'total_fat', 'total_weight')
             ->orderBy('name')
             ->get();
     }

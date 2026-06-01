@@ -110,8 +110,34 @@ class User extends Authenticatable
 
         // Cek employee → role → slug
         $roleSlug = $this->employee?->role?->slug;
+        if (!$roleSlug) {
+            return false;
+        }
 
-        return $roleSlug && in_array($roleSlug, $roles, true);
+        // Normalisasi pengecekan role (Inggris <-> Indonesia)
+        $normalizedRoles = [];
+        foreach ($roles as $role) {
+            $normalizedRoles[] = $role;
+            if ($role === 'courier') {
+                $normalizedRoles[] = 'kurir';
+            } elseif ($role === 'kurir') {
+                $normalizedRoles[] = 'courier';
+            } elseif ($role === 'admin_logistik') {
+                $normalizedRoles[] = 'admin-logistik';
+            } elseif ($role === 'admin-logistik') {
+                $normalizedRoles[] = 'admin_logistik';
+            } elseif ($role === 'admin_sppg') {
+                $normalizedRoles[] = 'admin-sppg';
+            } elseif ($role === 'admin-sppg') {
+                $normalizedRoles[] = 'admin_sppg';
+            } elseif ($role === 'ahli_gizi') {
+                $normalizedRoles[] = 'ahli-gizi';
+            } elseif ($role === 'ahli-gizi') {
+                $normalizedRoles[] = 'ahli_gizi';
+            }
+        }
+
+        return in_array($roleSlug, $normalizedRoles, true);
     }
 
     /**

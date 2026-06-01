@@ -28,6 +28,8 @@ class DatabaseSeeder extends Seeder
             PartnerSeeder::class,
             IngredientSeeder::class,
             RecipeSeeder::class,
+            SchoolSeeder::class,
+            DistributionSeeder::class,
         ]);
     }
 }
