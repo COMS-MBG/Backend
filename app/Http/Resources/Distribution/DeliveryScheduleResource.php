@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Resources;
+namespace App\Http\Resources\Distribution;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -22,20 +22,21 @@ class DeliveryScheduleResource extends JsonResource
             // Courier
             'courier' => $this->whenLoaded('courier', fn() => [
                 'id'   => $this->courier->id,
-                'name' => $this->courier->full_name ?? $this->courier->name,
+                'name' => $this->courier->name,
             ]),
 
             // School / destination
+            // BUG FIX: School pakai kolom 'nama' dan 'alamat' (bukan 'name'/'address')
             'school' => $this->whenLoaded('school', fn() => [
                 'id'        => $this->school->id,
-                'name'      => $this->school->name,
-                'address'   => $this->school->address ?? null,
-                'latitude'  => $this->school->latitude ?? null,
+                'name'      => $this->school->nama      ?? null,   // ← fix
+                'address'   => $this->school->alamat    ?? null,   // ← fix
+                'latitude'  => $this->school->latitude  ?? null,
                 'longitude' => $this->school->longitude ?? null,
             ]),
 
             // Assigned / submitted by
-            'assigned_by'  => $this->whenLoaded('assignedBy',  fn() => $this->assignedBy->name),
+            'assigned_by'  => $this->whenLoaded('assignedBy',  fn() => $this->assignedBy?->name),
             'submitted_by' => $this->whenLoaded('submittedBy', fn() => $this->submittedBy?->name),
 
             // Notes
@@ -45,8 +46,8 @@ class DeliveryScheduleResource extends JsonResource
             'rejection' => $this->when(
                 $this->status === 'rejected',
                 fn() => [
-                    'reason'    => $this->rejection_reason,
-                    'photo_url' => $this->rejection_photo_path
+                    'reason'      => $this->rejection_reason,
+                    'photo_url'   => $this->rejection_photo_path
                         ? Storage::url($this->rejection_photo_path)
                         : null,
                     'rejected_at' => $this->rejected_at?->toIso8601String(),
@@ -74,7 +75,7 @@ class DeliveryScheduleResource extends JsonResource
                 ]
             ),
 
-            // Revision
+            // Revision request notes
             'revision_notes' => $this->when(
                 $this->status === 'revision_required',
                 $this->confirmation_notes

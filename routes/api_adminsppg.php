@@ -47,10 +47,11 @@ Route::middleware(['auth:sanctum'])
             ->middleware('permission:employee.update');
 
         // School Management
-        Route::apiResource('schools', SchoolController::class);
-
-        // RBAC Management
-        Route::apiResource('roles', RoleController::class);
+        // FIX: tambah name prefix 'sppg.' agar tidak konflik dengan superadmin schools route
+        Route::name('sppg.')->group(function () {
+            Route::apiResource('schools', SchoolController::class);
+            Route::apiResource('roles', RoleController::class);
+        });
         Route::get('permissions', [PermissionController::class, 'index']);
     });
 
@@ -123,25 +124,31 @@ Route::middleware(['auth:sanctum'])
     });
 
     // ── Distribusi ────────────────────────────────────────────────────────────
+    // List & detail jadwal (admin SPPG bisa lihat semua, kurir hanya miliknya)
     Route::middleware('permission:distribution.read')->group(function () {
-        Route::get('distributions', [DistributionController::class, 'index']);
+        Route::get('distributions',                [DistributionController::class, 'index']);
         Route::get('distributions/{distribution}', [DistributionController::class, 'show']);
     });
-    Route::post('distributions', [DistributionController::class, 'store'])
+    // Submit tugas ke kurir (Admin SPPG action)
+    Route::post('distributions/submit', [DistributionController::class, 'store'])
         ->middleware('permission:distribution.create');
-    Route::match(['put', 'patch'], 'distributions/{distribution}', [DistributionController::class, 'update'])
+
+    // ── Courier Tracking (REST fallback – gunakan Reverb untuk real-time) ──────
+    Route::post('tracking/update-location',      [CourierTrackingController::class, 'updateLocation'])
         ->middleware('permission:distribution.update');
-    Route::delete('distributions/{distribution}', [DistributionController::class, 'destroy'])
-        ->middleware('permission:distribution.delete');
-    Route::post('tracking/update-location', [CourierTrackingController::class, 'updateLocation'])
-        ->middleware('permission:distribution.update');
+    Route::get('tracking/active',                [CourierTrackingController::class, 'activeCouriers'])
+        ->middleware('permission:distribution.read');
+    Route::get('tracking/{scheduleId}/trail',    [CourierTrackingController::class, 'trail'])
+        ->middleware('permission:distribution.read');
+
+    // ── Peta Distribusi ────────────────────────────────────────────────────────
     Route::get('maps/distribution', [DistributionMapController::class, 'index'])
         ->middleware('permission:distribution.read');
 
     // ── Laporan / Financial Reports ───────────────────────────────────────────
     Route::middleware('permission:report.read')->group(function () {
-        Route::get('financial-reports', [FinancialReportController::class, 'index']);
-        Route::get('financial-reports/{financial_report}', [FinancialReportController::class, 'show']);
+        Route::get('financial-reports',                          [FinancialReportController::class, 'index']);
+        Route::get('financial-reports/{financial_report}',       [FinancialReportController::class, 'show']);
     });
     Route::post('financial-reports', [FinancialReportController::class, 'store'])
         ->middleware('permission:report.create');

@@ -12,28 +12,34 @@ use Illuminate\Support\ServiceProvider;
  *
  * FILE LOCATION: app/Providers/DistributionServiceProvider.php
  *
- * HOW TO REGISTER:
- *   In config/app.php, add to 'providers' array:
- *   App\Providers\DistributionServiceProvider::class,
+ * ROUTE LOADING:
+ *   Routes di-load via routes/api.php (dibungkus auth:sanctum + prefix 'distribution').
+ *   JANGAN panggil loadRoutesFrom() di sini — akan menyebabkan routes terdaftar dua kali
+ *   (sekali tanpa prefix via ServiceProvider, sekali dengan prefix via api.php).
  *
- *   Or in bootstrap/providers.php (Laravel 11+):
+ * REGISTRASI:
+ *   Daftarkan di bootstrap/providers.php:
  *   App\Providers\DistributionServiceProvider::class,
  */
 class DistributionServiceProvider extends ServiceProvider
 {
     public function register(): void
     {
+        // Singleton bindings — DI container resolve sekali, reuse instance
         $this->app->singleton(DeliveryScheduleService::class);
         $this->app->singleton(RouteOptimizationService::class);
         $this->app->singleton(CourierLocationService::class);
 
-        // Merge module config
+        // Merge module config dari config/distribution.php
         $this->mergeConfigFrom(__DIR__ . '/../../config/distribution.php', 'distribution');
     }
 
     public function boot(): void
     {
-        // Load module routes
-        $this->loadRoutesFrom(base_path('routes/distribution.php'));
+        // Routes TIDAK di-load di sini.
+        // Sudah di-handle oleh routes/api.php dengan:
+        //   Route::middleware(['auth:sanctum'])
+        //       ->prefix('distribution')
+        //       ->group(base_path('routes/distribution.php'));
     }
 }

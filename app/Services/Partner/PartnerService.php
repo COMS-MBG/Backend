@@ -5,7 +5,6 @@ namespace App\Services\Partner;
 use App\Models\Partner;
 use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Str;
 
 class PartnerService
 {
@@ -15,29 +14,29 @@ class PartnerService
     {
         $query = Partner::query();
 
-        if (!empty($filters['bentuk'])) {
-            $query->where('bentuk', $filters['bentuk']);
+        if (!empty($filters['school_type'])) {
+            $query->where('school_type', $filters['school_type']);
         }
-        if (!empty($filters['status'])) {
-            $query->where('status', $filters['status']);
+        if (!empty($filters['ownership_status'])) {
+            $query->where('ownership_status', $filters['ownership_status']);
         }
-        if (!empty($filters['kecamatan'])) {
-            $query->where('kecamatan', 'like', "%{$filters['kecamatan']}%");
+        if (!empty($filters['district'])) {
+            $query->where('district', 'like', "%{$filters['district']}%");
         }
-        if (!empty($filters['kabupaten_kota'])) {
-            $query->where('kabupaten_kota', 'like', "%{$filters['kabupaten_kota']}%");
+        if (!empty($filters['city'])) {
+            $query->where('city', 'like', "%{$filters['city']}%");
         }
         if (!empty($filters['search'])) {
             $search = $filters['search'];
             $query->where(function ($q) use ($search) {
-                $q->where('nama_sekolah', 'like', "%{$search}%")
-                  ->orWhere('npsn', 'like', "%{$search}%")
-                  ->orWhere('kecamatan', 'like', "%{$search}%")
-                  ->orWhere('kabupaten_kota', 'like', "%{$search}%");
+                $q->where('school_name', 'like', "%{$search}%")
+                  ->orWhere('npsn',        'like', "%{$search}%")
+                  ->orWhere('district',    'like', "%{$search}%")
+                  ->orWhere('city',        'like', "%{$search}%");
             });
         }
 
-        return $query->orderBy('nama_sekolah')->paginate($perPage);
+        return $query->orderBy('school_name')->paginate($perPage);
     }
 
     // ─── Find by ID ───────────────────────────────────────────────────────────
@@ -76,12 +75,12 @@ class PartnerService
     public function getSummary(): array
     {
         return [
-            'total_schools'  => Partner::count(),
-            'total_negeri'   => Partner::where('status', 'Negeri')->count(),
-            'total_swasta'   => Partner::where('status', 'Swasta')->count(),
-            'total_sma'      => Partner::where('bentuk', 'SMA')->count(),
-            'total_smk'      => Partner::where('bentuk', 'SMK')->count(),
-            'total_porsi'    => (int) Partner::sum('jumlah_porsi'),
+            'total_schools'         => Partner::count(),
+            'total_public'          => Partner::where('ownership_status', 'public')->count(),
+            'total_private'         => Partner::where('ownership_status', 'private')->count(),
+            'total_sma'             => Partner::where('school_type', 'SMA')->count(),
+            'total_smk'             => Partner::where('school_type', 'SMK')->count(),
+            'total_portion_count'   => (int) Partner::sum('portion_count'),
         ];
     }
 
@@ -122,7 +121,7 @@ class PartnerService
                 'created' => 0,
                 'updated' => 0,
                 'skipped' => 0,
-                'errors'  => ['File tidak berisi data yang valid.'],
+                'errors'  => ['File contains no valid data.'],
                 'total'   => 0,
             ];
         }
@@ -138,10 +137,10 @@ class PartnerService
      */
     public function importFromRows(array $rows): array
     {
-        $created  = 0;
-        $updated  = 0;
-        $skipped  = 0;
-        $errors   = [];
+        $created = 0;
+        $updated = 0;
+        $skipped = 0;
+        $errors  = [];
 
         DB::beginTransaction();
 
@@ -150,55 +149,56 @@ class PartnerService
                 $rowNum = $index + 2; // +2 because row 1 is header
 
                 // Validate required fields
-                $namaSekolah = trim($row['nama_sekolah'] ?? '');
-                if (empty($namaSekolah)) {
-                    $errors[] = "Baris {$rowNum}: Nama Sekolah kosong, dilewati.";
+                $schoolName = trim($row['school_name'] ?? '');
+                if (empty($schoolName)) {
+                    $errors[] = "Row {$rowNum}: School name is empty, skipped.";
                     $skipped++;
                     continue;
                 }
 
-                $bentuk = trim($row['bentuk'] ?? '');
-                if (empty($bentuk)) {
-                    $errors[] = "Baris {$rowNum}: Bentuk kosong, dilewati.";
+                $schoolType = trim($row['school_type'] ?? '');
+                if (empty($schoolType)) {
+                    $errors[] = "Row {$rowNum}: School type is empty, skipped.";
                     $skipped++;
                     continue;
                 }
 
                 $npsn = trim($row['npsn'] ?? '');
 
+                // Normalize ownership status from Indonesian input (CSV backward compat)
+                $rawStatus = trim($row['ownership_status'] ?? 'public');
+                $ownershipStatus = match (strtolower($rawStatus)) {
+                    'negeri' => 'public',
+                    'swasta' => 'private',
+                    default  => in_array(strtolower($rawStatus), ['public', 'private'])
+                                    ? strtolower($rawStatus)
+                                    : 'public',
+                };
+
+                $rowData = [
+                    'school_name'      => $schoolName,
+                    'school_type'      => $schoolType,
+                    'ownership_status' => $ownershipStatus,
+                    'address'          => trim($row['address'] ?? ''),
+                    'district'         => trim($row['district'] ?? ''),
+                    'city'             => trim($row['city'] ?? ''),
+                    'latitude'         => $this->parseCoordinate($row['latitude'] ?? null),
+                    'longitude'        => $this->parseCoordinate($row['longitude'] ?? null),
+                    'portion_count'    => (int) ($row['portion_count'] ?? 0),
+                ];
+
                 // Upsert by NPSN if available, otherwise create new
                 if (!empty($npsn)) {
                     $existing = Partner::where('npsn', $npsn)->first();
 
                     if ($existing) {
-                        $existing->update([
-                            'nama_sekolah'   => $namaSekolah,
-                            'bentuk'         => $bentuk,
-                            'status'         => trim($row['status'] ?? 'Negeri'),
-                            'alamat'         => trim($row['alamat'] ?? ''),
-                            'kecamatan'      => trim($row['kecamatan'] ?? ''),
-                            'kabupaten_kota' => trim($row['kabupaten_kota'] ?? ''),
-                            'latitude'       => $this->parseCoordinate($row['latitude'] ?? null),
-                            'longitude'      => $this->parseCoordinate($row['longitude'] ?? null),
-                            'jumlah_porsi'   => (int) ($row['jumlah_porsi'] ?? 0),
-                        ]);
+                        $existing->update($rowData);
                         $updated++;
                         continue;
                     }
                 }
 
-                Partner::create([
-                    'nama_sekolah'   => $namaSekolah,
-                    'npsn'           => $npsn ?: null,
-                    'bentuk'         => $bentuk,
-                    'status'         => trim($row['status'] ?? 'Negeri'),
-                    'alamat'         => trim($row['alamat'] ?? ''),
-                    'kecamatan'      => trim($row['kecamatan'] ?? ''),
-                    'kabupaten_kota' => trim($row['kabupaten_kota'] ?? ''),
-                    'latitude'       => $this->parseCoordinate($row['latitude'] ?? null),
-                    'longitude'      => $this->parseCoordinate($row['longitude'] ?? null),
-                    'jumlah_porsi'   => (int) ($row['jumlah_porsi'] ?? 0),
-                ]);
+                Partner::create(array_merge($rowData, ['npsn' => $npsn ?: null]));
                 $created++;
             }
 
@@ -223,31 +223,38 @@ class PartnerService
     /**
      * Header alias map: normalized alias → internal column name.
      *
-     * Normalization applied to aliases: lowercase, trimmed, underscores→spaces.
-     * Aliases are checked AFTER the same normalization on CSV headers.
+     * Accepts both English and Indonesian headers for backward compatibility
+     * with existing CSV templates users may already have.
      */
     private const HEADER_ALIASES = [
-        // nama_sekolah
-        'nama sekolah'    => 'nama_sekolah',
-        'nama_sekolah'    => 'nama_sekolah',
-        'school name'     => 'nama_sekolah',
+        // school_name (supports legacy Indonesian headers)
+        'school name'     => 'school_name',
+        'school_name'     => 'school_name',
+        'nama sekolah'    => 'school_name',
+        'nama_sekolah'    => 'school_name',
         // npsn
         'npsn'            => 'npsn',
-        // bentuk
-        'bentuk'          => 'bentuk',
-        'jenis'           => 'bentuk',
-        // status
-        'status'          => 'status',
-        // alamat
-        'alamat'          => 'alamat',
-        'address'         => 'alamat',
-        // kecamatan
-        'kecamatan'       => 'kecamatan',
-        // kabupaten_kota
-        'kabupaten/kota'  => 'kabupaten_kota',
-        'kabupaten kota'  => 'kabupaten_kota',
-        'kabupaten_kota'  => 'kabupaten_kota',
-        'kota'            => 'kabupaten_kota',
+        // school_type
+        'school type'     => 'school_type',
+        'school_type'     => 'school_type',
+        'bentuk'          => 'school_type',
+        'jenis'           => 'school_type',
+        // ownership_status
+        'ownership status'=> 'ownership_status',
+        'ownership_status'=> 'ownership_status',
+        'status'          => 'ownership_status',
+        // address
+        'address'         => 'address',
+        'alamat'          => 'address',
+        // district
+        'district'        => 'district',
+        'kecamatan'       => 'district',
+        // city
+        'city'            => 'city',
+        'kabupaten/kota'  => 'city',
+        'kabupaten kota'  => 'city',
+        'kabupaten_kota'  => 'city',
+        'kota'            => 'city',
         // latitude
         'latitude'        => 'latitude',
         'lat'             => 'latitude',
@@ -257,11 +264,14 @@ class PartnerService
         'lng'             => 'longitude',
         'long'            => 'longitude',
         'bujur'           => 'longitude',
-        // jumlah_porsi
-        'jumlah porsi'    => 'jumlah_porsi',
-        'jumlah_porsi'    => 'jumlah_porsi',
-        'porsi'           => 'jumlah_porsi',
-        'total porsi'     => 'jumlah_porsi',
+        // portion_count
+        'portion count'   => 'portion_count',
+        'portion_count'   => 'portion_count',
+        'portions'        => 'portion_count',
+        'jumlah porsi'    => 'portion_count',
+        'jumlah_porsi'    => 'portion_count',
+        'porsi'           => 'portion_count',
+        'total porsi'     => 'portion_count',
         // skip-only
         'no'              => null,
     ];
@@ -269,16 +279,10 @@ class PartnerService
     /**
      * Internal keys that MUST be covered by at least one CSV header alias.
      */
-    private const REQUIRED_KEYS = ['nama_sekolah', 'bentuk', 'status', 'jumlah_porsi'];
+    private const REQUIRED_KEYS = ['school_name', 'school_type', 'ownership_status', 'portion_count'];
 
     /**
      * Normalize a raw CSV header string.
-     *
-     * - Strip UTF-8 BOM
-     * - Trim whitespace
-     * - Lowercase
-     * - Replace underscores with spaces (so "nama_sekolah" → "nama sekolah")
-     * - Collapse multiple spaces
      */
     private function normalizeHeader(string $raw): string
     {
@@ -301,13 +305,12 @@ class PartnerService
      */
     private function parseCsv(string $path): array
     {
-        // Read file content and strip BOM from the entire file first
         $content = file_get_contents($path);
         if ($content === false || trim($content) === '') {
-            return ['error' => 'File kosong atau tidak dapat dibaca.', 'rows' => []];
+            return ['error' => 'File is empty or cannot be read.', 'rows' => []];
         }
 
-        // Strip UTF-8 BOM from file start
+        // Strip UTF-8 BOM
         $content = preg_replace('/^\xEF\xBB\xBF/', '', $content);
 
         // Detect delimiter: semicolon (European Excel), tab, or comma
@@ -319,7 +322,6 @@ class PartnerService
             $delimiter = "\t";
         }
 
-        // Parse via temp stream so fgetcsv works with detected delimiter
         $handle = fopen('php://temp', 'r+');
         fwrite($handle, $content);
         rewind($handle);
@@ -328,7 +330,7 @@ class PartnerService
         $rawHeader = fgetcsv($handle, 0, $delimiter);
         if (!$rawHeader) {
             fclose($handle);
-            return ['error' => 'Header CSV tidak dapat dibaca.', 'rows' => []];
+            return ['error' => 'CSV header row could not be read.', 'rows' => []];
         }
 
         // Normalize headers → map to internal keys
@@ -339,18 +341,17 @@ class PartnerService
             $normalized  = $this->normalizeHeader((string) $col);
             $internalKey = self::HEADER_ALIASES[$normalized] ?? null;
 
-            // Also try the raw-normalized form directly in the alias map
-            // (handles "kabupaten/kota" which doesn't get underscore-replaced)
+            // Also try raw-normalized form directly (handles "kabupaten/kota")
             if ($internalKey === null) {
                 $withoutUnderscore = mb_strtolower(trim(preg_replace('/^\xEF\xBB\xBF/', '', (string) $col)));
                 $internalKey = self::HEADER_ALIASES[$withoutUnderscore] ?? null;
             }
 
-            $mappedHeaders[]   = $internalKey; // null = skip this column
+            $mappedHeaders[]   = $internalKey;
             $detectedColumns[] = trim((string) $col);
         }
 
-        // Validate: check that all required internal keys are covered
+        // Validate required columns
         $coveredKeys    = array_filter(array_unique($mappedHeaders));
         $missingColumns = [];
 
@@ -363,11 +364,10 @@ class PartnerService
         if (!empty($missingColumns)) {
             fclose($handle);
 
-            // Human-readable label for error message
             $labels = array_map(fn ($k) => str_replace('_', ' ', $k), $missingColumns);
 
             return [
-                'error'            => 'Kolom wajib tidak ditemukan: ' . implode(', ', $labels) . '.',
+                'error'            => 'Required columns not found: ' . implode(', ', $labels) . '.',
                 'missing_columns'  => $missingColumns,
                 'detected_columns' => $detectedColumns,
                 'rows'             => [],
@@ -385,7 +385,7 @@ class PartnerService
                 }
             }
 
-            if (!empty(trim($row['nama_sekolah'] ?? ''))) {
+            if (!empty(trim($row['school_name'] ?? ''))) {
                 $rows[] = $row;
             }
         }

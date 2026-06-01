@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Resources;
+namespace App\Http\Resources\Distribution;
 
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
@@ -23,7 +23,7 @@ class DeliveryHistoryResource extends JsonResource
             'duration_minutes' => $this->duration_minutes,
             'distance_km'      => $this->distance_km,
             'proof_photo_url'  => $this->proof_photo_path
-                ? Storage::url($this->proof_photo_path)  // ← ganti ini
+                ? Storage::url($this->proof_photo_path)
                 : null,
             'route_snapshot'   => $this->route_snapshot,
             'confirmed_by'     => $this->whenLoaded('confirmedBy', fn() => $this->confirmedBy?->name),

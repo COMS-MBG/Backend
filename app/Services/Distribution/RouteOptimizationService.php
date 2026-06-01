@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\SPPG;
+namespace App\Services\Distribution;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
@@ -23,7 +23,6 @@ use Illuminate\Support\Facades\Log;
  *
  * OSRM SELF-HOSTING:
  *   For production, host your own OSRM instance with Indonesia OSM data.
- *   docker run -t -v $(pwd):/data ghcr.io/project-osrm/osrm-backend osrm-extract ...
  *   Set OSRM_BASE_URL in .env (default: https://router.project-osrm.org)
  */
 class RouteOptimizationService
@@ -38,14 +37,19 @@ class RouteOptimizationService
     /**
      * Optimize delivery order and get road-snapped route.
      *
-     * @param  array  $origin  ['lat' => float, 'lng' => float]  – SPG/depot location
+     * @param  array  $origin     ['lat' => float, 'lng' => float]
      * @param  array  $waypoints  [['lat'=>float,'lng'=>float,'school_id'=>int,'name'=>str], ...]
      * @return array  ['ordered_waypoints'=>[...], 'geojson'=>LineString, 'total_distance_km'=>float, 'total_duration_min'=>float]
      */
     public function optimize(array $origin, array $waypoints): array
     {
         if (count($waypoints) === 0) {
-            return ['ordered_waypoints' => [], 'geojson' => null, 'total_distance_km' => 0, 'total_duration_min' => 0];
+            return [
+                'ordered_waypoints'  => [],
+                'geojson'            => null,
+                'total_distance_km'  => 0,
+                'total_duration_min' => 0,
+            ];
         }
 
         // Step 1 – determine optimal visit order (nearest-neighbour TSP)
@@ -94,7 +98,7 @@ class RouteOptimizationService
     private function fetchOsrmRoute(array $origin, array $waypoints): array
     {
         // Build coordinate string: lon,lat;lon,lat;...
-        $coords = array_map(fn($p) => "{$p['lng']},{$p['lat']}", array_merge([$origin], $waypoints));
+        $coords   = array_map(fn($p) => "{$p['lng']},{$p['lat']}", array_merge([$origin], $waypoints));
         $coordStr = implode(';', $coords);
 
         $url = "{$this->osrmBase}/route/v1/driving/{$coordStr}";
@@ -120,7 +124,7 @@ class RouteOptimizationService
             }
 
             return [
-                'geojson'            => $route['geometry'],       // GeoJSON LineString
+                'geojson'            => $route['geometry'],
                 'total_distance_km'  => round($route['distance'] / 1000, 3),
                 'total_duration_min' => round($route['duration'] / 60, 1),
             ];
@@ -141,7 +145,7 @@ class RouteOptimizationService
         $totalKm = 0.0;
         for ($i = 0; $i < count($points) - 1; $i++) {
             $totalKm += $this->haversine(
-                $points[$i]['lat'], $points[$i]['lng'],
+                $points[$i]['lat'],     $points[$i]['lng'],
                 $points[$i + 1]['lat'], $points[$i + 1]['lng']
             );
         }
@@ -152,7 +156,7 @@ class RouteOptimizationService
                 'coordinates' => $coords,
             ],
             'total_distance_km'  => round($totalKm, 3),
-            'total_duration_min' => round(($totalKm / 30) * 60, 1), // assume 30 km/h
+            'total_duration_min' => round(($totalKm / 30) * 60, 1), // assume 30 km/h average
         ];
     }
 

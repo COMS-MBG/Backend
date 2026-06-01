@@ -14,26 +14,26 @@ class Partner extends Model
     protected $table = 'partners';
 
     protected $fillable = [
-        'nama_sekolah',
+        'school_name',
         'npsn',
-        'bentuk',
-        'status',
-        'alamat',
-        'kecamatan',
-        'kabupaten_kota',
+        'school_type',
+        'ownership_status',
+        'address',
+        'district',
+        'city',
         'latitude',
         'longitude',
-        'jumlah_porsi',
+        'portion_count',
         'sppg_id',
     ];
 
     protected $casts = [
-        'jumlah_porsi' => 'integer',
-        'latitude'     => 'float',
-        'longitude'    => 'float',
+        'portion_count' => 'integer',
+        'latitude'      => 'float',
+        'longitude'     => 'float',
     ];
 
-    // ─── Relasi ────────────────────────────────────────────────────────────────
+    // ─── Relationships ─────────────────────────────────────────────────────────
 
     public function sppg()
     {
@@ -42,24 +42,24 @@ class Partner extends Model
 
     // ─── Scopes ────────────────────────────────────────────────────────────────
 
-    public function scopeByBentuk($query, string $bentuk)
+    public function scopeBySchoolType($query, string $type)
     {
-        return $query->where('bentuk', $bentuk);
+        return $query->where('school_type', $type);
     }
 
-    public function scopeByStatus($query, string $status)
+    public function scopeByOwnershipStatus($query, string $status)
     {
-        return $query->where('status', $status);
+        return $query->where('ownership_status', $status);
     }
 
-    public function scopeByKecamatan($query, string $kecamatan)
+    public function scopeByDistrict($query, string $district)
     {
-        return $query->where('kecamatan', $kecamatan);
+        return $query->where('district', $district);
     }
 
-    public function scopeByKabupatenKota($query, string $kota)
+    public function scopeByCity($query, string $city)
     {
-        return $query->where('kabupaten_kota', $kota);
+        return $query->where('city', $city);
     }
 
     public function scopeBySppg($query, string $sppgId)
@@ -69,8 +69,13 @@ class Partner extends Model
 
     // ─── Accessors ─────────────────────────────────────────────────────────────
 
-    public function getIsNegeriAttribute(): bool
+    public function getIsPublicAttribute(): bool
     {
-        return strtolower($this->status) === 'negeri';
+        return strtolower($this->ownership_status) === 'public';
+    }
+
+    public function getIsPrivateAttribute(): bool
+    {
+        return strtolower($this->ownership_status) === 'private';
     }
 }

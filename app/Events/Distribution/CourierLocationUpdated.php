@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Events;
+namespace App\Events\Distribution;
 
 use App\Models\CourierLocation;
 use Illuminate\Broadcasting\InteractsWithSockets;
@@ -10,14 +10,14 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Broadcast GPS ping to admin spatial map.
+ * Broadcast GPS ping ke peta spasial admin.
  *
- * CHANNEL: presence-distribution.map
- * EVENT NAME: distribution.courier.location
+ * CHANNEL  : presence-distribution.map
+ * EVENT    : distribution.courier.location
  *
- * HIGH-FREQUENCY EVENTS:
- *   Mobile app should send a GPS ping every 5–10 seconds while delivering.
- *   FE map subscribes:
+ * HIGH-FREQUENCY: mobile app kirim ping setiap 5-10 detik saat mengantarkan.
+ *
+ * FE subscribe:
  *   Echo.join('distribution.map').listen('.distribution.courier.location', (data) => updateMarker(data))
  */
 class CourierLocationUpdated implements ShouldBroadcastNow

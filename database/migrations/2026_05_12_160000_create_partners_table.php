@@ -10,25 +10,25 @@ return new class extends Migration
     {
         Schema::create('partners', function (Blueprint $table) {
             $table->uuid('id')->primary();
-            $table->string('nama_sekolah');
+            $table->string('school_name');
             $table->string('npsn')->nullable()->unique();
-            $table->string('bentuk', 50);           // SMA, SMK, MA, dll
-            $table->string('status', 50);            // Negeri, Swasta
-            $table->text('alamat')->nullable();
-            $table->string('kecamatan', 100)->nullable();
-            $table->string('kabupaten_kota', 100)->nullable();
+            $table->string('school_type', 50);           // SMA, SMK, MA, etc.
+            $table->string('ownership_status', 50);      // public, private
+            $table->text('address')->nullable();
+            $table->string('district', 100)->nullable();
+            $table->string('city', 100)->nullable();
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
-            $table->unsignedInteger('jumlah_porsi')->default(0);
+            $table->unsignedInteger('portion_count')->default(0);
             $table->uuid('sppg_id')->nullable()->index();
             $table->timestamps();
             $table->softDeletes();
 
             // ── Indexes for frequent queries ──
-            $table->index('bentuk');
-            $table->index('status');
-            $table->index('kecamatan');
-            $table->index('kabupaten_kota');
+            $table->index('school_type');
+            $table->index('ownership_status');
+            $table->index('district');
+            $table->index('city');
         });
     }
 

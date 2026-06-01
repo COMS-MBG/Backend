@@ -10,24 +10,25 @@ class PartnerResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'             => $this->id,
-            'nama_sekolah'   => $this->nama_sekolah,
-            'npsn'           => $this->npsn,
-            'bentuk'         => $this->bentuk,
-            'status'         => $this->status,
-            'alamat'         => $this->alamat,
-            'kecamatan'      => $this->kecamatan,
-            'kabupaten_kota' => $this->kabupaten_kota,
-            'latitude'       => $this->latitude,
-            'longitude'      => $this->longitude,
-            'jumlah_porsi'   => $this->jumlah_porsi,
-            'sppg_id'        => $this->sppg_id,
-            'sppg'           => $this->whenLoaded('sppg', fn() => [
+            'id'               => $this->id,
+            'school_name'      => $this->school_name,
+            'npsn'             => $this->npsn,
+            'school_type'      => $this->school_type,
+            'ownership_status' => $this->ownership_status,
+            'address'          => $this->address,
+            'district'         => $this->district,
+            'city'             => $this->city,
+            'latitude'         => $this->latitude,
+            'longitude'        => $this->longitude,
+            'portion_count'    => $this->portion_count,
+            'sppg_id'          => $this->sppg_id,
+            'sppg'             => $this->whenLoaded('sppg', fn() => [
                 'id'   => $this->sppg?->id,
-                'nama' => $this->sppg?->nama,
+                'name' => $this->sppg?->name,
             ]),
-            'created_at' => $this->created_at?->toISOString(),
-            'updated_at' => $this->updated_at?->toISOString(),
+            'is_public'        => $this->is_public,
+            'created_at'       => $this->created_at?->toISOString(),
+            'updated_at'       => $this->updated_at?->toISOString(),
         ];
     }
 }

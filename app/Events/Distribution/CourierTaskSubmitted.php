@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Events;
+namespace App\Events\Distribution;
 
 use App\Models\DeliverySchedule;
 use Illuminate\Broadcasting\Channel;
@@ -11,17 +11,18 @@ use Illuminate\Foundation\Events\Dispatchable;
 use Illuminate\Queue\SerializesModels;
 
 /**
- * Broadcast via Laravel Reverb to notify a specific courier of a new task.
+ * Broadcast via Laravel Reverb – notifikasi tugas baru ke kurir.
  *
- * CHANNEL: private-courier.{courier_id}
- * EVENT NAME: distribution.task.submitted
+ * CHANNEL  : private-courier.{courier_id}
+ * EVENT    : distribution.task.submitted
  *
- * REVERB SETUP:
+ * Setup Reverb:
  *   1. php artisan reverb:install
- *   2. Set REVERB_APP_ID, REVERB_APP_KEY, REVERB_APP_SECRET in .env
- *   3. php artisan reverb:start  (dev) or use supervisor in production
+ *   2. Set REVERB_APP_ID, REVERB_APP_KEY, REVERB_APP_SECRET di .env
+ *   3. php artisan reverb:start  (dev) / supervisor (production)
  *
- * FE subscribes: Echo.private(`courier.${courierId}`).listen('.distribution.task.submitted', cb)
+ * FE subscribe:
+ *   Echo.private(`courier.${courierId}`).listen('.distribution.task.submitted', cb)
  */
 class CourierTaskSubmitted implements ShouldBroadcastNow
 {
@@ -47,8 +48,8 @@ class CourierTaskSubmitted implements ShouldBroadcastNow
     {
         return [
             'schedule_id'    => $this->schedule->id,
-            'school_name'    => $this->schedule->school->name ?? '',
-            'school_address' => $this->schedule->school->address ?? '',
+            'school_name'    => $this->schedule->school?->nama    ?? '',   // fix: pakai 'nama'
+            'school_address' => $this->schedule->school?->alamat  ?? '',   // fix: pakai 'alamat'
             'vehicle_type'   => $this->schedule->vehicle_type,
             'vehicle_plate'  => $this->schedule->vehicle_plate,
             'scheduled_at'   => $this->schedule->scheduled_at?->toIso8601String(),

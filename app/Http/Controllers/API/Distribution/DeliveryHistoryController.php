@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\Distribution;
+namespace App\Http\Controllers\API\Distribution;
 
 use App\Http\Controllers\Controller;
 use App\Http\Resources\Distribution\DeliveryHistoryResource;
@@ -13,7 +13,7 @@ use Illuminate\Http\Request;
  *  DELIVERY HISTORY CONTROLLER
  * ============================================================
  *
- * "PINTU KELUAR" – semua endpoint di sini bersifat READ ONLY.
+ * "PINTU KELUAR" – semua endpoint READ ONLY.
  * Data masuk melalui DeliveryScheduleController::confirmDelivery()
  *
  * Base path: /api/distribution/histories
@@ -21,21 +21,21 @@ use Illuminate\Http\Request;
  */
 class DeliveryHistoryController extends Controller
 {
-    // ─── [GET] Paginated list of delivery histories ───────────────────────────
-    // PINTU KELUAR – FE history page
+    // ─── [GET] Paginated list ─────────────────────────────────────────────────
     public function index(Request $request): JsonResponse
     {
         $query = DeliveryHistory::with(['confirmedBy'])
             ->latest('departed_at');
 
-        // Courier sees only their own history
-        if ($request->user()->hasRole('courier')) {
+        // Kurir hanya melihat riwayat miliknya sendiri
+        // BUG FIX: hasRole() → hasAnyRole()
+        if ($request->user()->hasAnyRole(['courier'])) {
             $courierId = $request->user()->employee?->id;
             $query->where('courier_id', $courierId);
         }
 
         // Filters
-        if ($request->filled('courier_id')) {
+        if ($request->filled('courier_id') && !$request->user()->hasAnyRole(['courier'])) {
             $query->where('courier_id', $request->courier_id);
         }
 
@@ -65,7 +65,6 @@ class DeliveryHistoryController extends Controller
     }
 
     // ─── [GET] Single history detail ──────────────────────────────────────────
-    // PINTU KELUAR
     public function show(DeliveryHistory $history): JsonResponse
     {
         $history->load(['courier', 'school', 'confirmedBy', 'schedule']);
@@ -77,7 +76,7 @@ class DeliveryHistoryController extends Controller
     }
 
     // ─── [GET] Analytics summary ──────────────────────────────────────────────
-    // PINTU KELUAR – used by Spatial & Analytics feature
+    // PINTU KELUAR – dipakai halaman Spatial & Analytics
     public function analytics(Request $request): JsonResponse
     {
         abort_unless(
@@ -86,7 +85,7 @@ class DeliveryHistoryController extends Controller
         );
 
         $from = $request->date('date_from', now()->startOfMonth());
-        $to   = $request->date('date_to', now()->endOfMonth());
+        $to   = $request->date('date_to',   now()->endOfMonth());
 
         $histories = DeliveryHistory::whereBetween('departed_at', [$from, $to])->get();
 
@@ -97,12 +96,12 @@ class DeliveryHistoryController extends Controller
                     'from' => $from->toDateString(),
                     'to'   => $to->toDateString(),
                 ],
-                'total_deliveries'      => $histories->count(),
-                'total_distance_km'     => round($histories->sum('distance_km'), 2),
-                'avg_duration_minutes'  => round($histories->avg(fn($h) => $h->duration_minutes), 1),
-                'deliveries_per_courier'=> $histories->groupBy('courier_name')->map->count()->sortDesc(),
-                'deliveries_per_school' => $histories->groupBy('school_name')->map->count()->sortDesc(),
-                'vehicle_breakdown'     => $histories->groupBy('vehicle_type')->map->count(),
+                'total_deliveries'       => $histories->count(),
+                'total_distance_km'      => round($histories->sum('distance_km'), 2),
+                'avg_duration_minutes'   => round($histories->avg(fn($h) => $h->duration_minutes), 1),
+                'deliveries_per_courier' => $histories->groupBy('courier_name')->map->count()->sortDesc(),
+                'deliveries_per_school'  => $histories->groupBy('school_name')->map->count()->sortDesc(),
+                'vehicle_breakdown'      => $histories->groupBy('vehicle_type')->map->count(),
             ],
         ]);
     }

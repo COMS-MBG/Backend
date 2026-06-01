@@ -14,30 +14,30 @@ class StorePartnerRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nama_sekolah'   => 'required|string|max:255',
-            'npsn'           => 'nullable|string|max:50|unique:partners,npsn',
-            'bentuk'         => 'required|string|in:SD,SMP,SMA,SMK,MI,MTs,MA,MAK',
-            'status'         => 'required|string|in:Negeri,Swasta',
-            'alamat'         => 'nullable|string',
-            'kecamatan'      => 'nullable|string|max:100',
-            'kabupaten_kota' => 'nullable|string|max:100',
-            'latitude'       => 'nullable|numeric|between:-90,90',
-            'longitude'      => 'nullable|numeric|between:-180,180',
-            'jumlah_porsi'   => 'required|integer|min:0',
+            'school_name'      => 'required|string|max:255',
+            'npsn'             => 'nullable|string|max:50|unique:partners,npsn',
+            'school_type'      => 'required|string|in:SD,SMP,SMA,SMK,MI,MTs,MA,MAK',
+            'ownership_status' => 'required|string|in:public,private',
+            'address'          => 'nullable|string',
+            'district'         => 'nullable|string|max:100',
+            'city'             => 'nullable|string|max:100',
+            'latitude'         => 'nullable|numeric|between:-90,90',
+            'longitude'        => 'nullable|numeric|between:-180,180',
+            'portion_count'    => 'required|integer|min:0',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'nama_sekolah.required' => 'Nama sekolah wajib diisi.',
-            'bentuk.required'       => 'Bentuk sekolah wajib dipilih.',
-            'bentuk.in'             => 'Bentuk sekolah tidak valid.',
-            'status.required'       => 'Status sekolah wajib dipilih.',
-            'status.in'             => 'Status harus Negeri atau Swasta.',
-            'npsn.unique'           => 'NPSN sudah terdaftar.',
-            'jumlah_porsi.required' => 'Jumlah porsi wajib diisi.',
-            'jumlah_porsi.min'      => 'Jumlah porsi tidak boleh negatif.',
+            'school_name.required'      => 'School name is required.',
+            'school_type.required'      => 'School type is required.',
+            'school_type.in'            => 'Invalid school type. Must be one of: SD, SMP, SMA, SMK, MI, MTs, MA, MAK.',
+            'ownership_status.required' => 'Ownership status is required.',
+            'ownership_status.in'       => 'Ownership status must be either public or private.',
+            'npsn.unique'               => 'This NPSN is already registered.',
+            'portion_count.required'    => 'Portion count is required.',
+            'portion_count.min'         => 'Portion count cannot be negative.',
         ];
     }
 }

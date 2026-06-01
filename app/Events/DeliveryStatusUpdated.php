@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Events\Distribution;
+namespace App\Events;
 
 use App\Models\DeliverySchedule;
 use Illuminate\Broadcasting\InteractsWithSockets;

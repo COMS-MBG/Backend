@@ -1,9 +1,11 @@
 <?php
 
-use App\Http\Controllers\Api\Distribution\DeliveryHistoryController;
-use App\Http\Controllers\Api\Distribution\DeliveryScheduleController;
-use App\Http\Controllers\Api\Distribution\SpatialMapController;
+// BUG FIX: namespace harus API (huruf kapital) sesuai folder fisik app/Http/Controllers/API/
+use App\Http\Controllers\API\Distribution\DeliveryHistoryController;
+use App\Http\Controllers\API\Distribution\DeliveryScheduleController;
+use App\Http\Controllers\API\Distribution\SpatialMapController;
 use Illuminate\Support\Facades\Route;
+
 
 /*
 |--------------------------------------------------------------------------

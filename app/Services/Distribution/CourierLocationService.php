@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Services\SPPG;
+namespace App\Services\Distribution;
 
 use App\Events\Distribution\CourierLocationUpdated;
 use App\Models\CourierLocation;
@@ -25,9 +25,9 @@ class CourierLocationService
             'courier_id'           => $schedule->courier_id,
             'latitude'             => $data['latitude'],
             'longitude'            => $data['longitude'],
-            'speed_kmh'            => $data['speed_kmh'] ?? null,
-            'heading_degrees'      => $data['heading_degrees'] ?? null,
-            'accuracy_meters'      => $data['accuracy_meters'] ?? null,
+            'speed_kmh'            => $data['speed_kmh']        ?? null,
+            'heading_degrees'      => $data['heading_degrees']  ?? null,
+            'accuracy_meters'      => $data['accuracy_meters']  ?? null,
             'recorded_at'          => now(),
         ]);
 
@@ -43,22 +43,28 @@ class CourierLocationService
 
     /**
      * Get the latest known location of every active courier.
+     * BUG FIX: kolom School adalah 'nama', bukan 'name'.
      */
     public function getActiveCourierLocations(): array
     {
         $activeSchedules = DeliverySchedule::where('status', DeliverySchedule::STATUS_DELIVERING)
-            ->with(['latestLocation', 'courier:id,name,full_name', 'school:id,name,latitude,longitude'])
+            ->with([
+                'latestLocation',
+                'courier:id,name',
+                'school:id,nama,latitude,longitude',   // ← fix: pakai 'nama' bukan 'name'
+            ])
             ->get();
 
         return $activeSchedules->map(function ($schedule) {
             $loc = $schedule->latestLocation;
+
             return [
                 'schedule_id'  => $schedule->id,
                 'courier_id'   => $schedule->courier_id,
-                'courier_name' => $schedule->courier->full_name ?? $schedule->courier->name,
+                'courier_name' => $schedule->courier->name ?? '',
                 'school'       => [
                     'id'        => $schedule->school->id,
-                    'name'      => $schedule->school->name,
+                    'name'      => $schedule->school->nama      ?? '',    // ← fix
                     'latitude'  => $schedule->school->latitude,
                     'longitude' => $schedule->school->longitude,
                 ],

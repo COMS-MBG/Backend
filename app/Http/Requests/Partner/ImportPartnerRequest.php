@@ -21,9 +21,9 @@ class ImportPartnerRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'file.required' => 'File import wajib diunggah.',
-            'file.mimes'    => 'File harus berformat CSV, XLSX, atau XLS.',
-            'file.max'      => 'Ukuran file maksimal 10MB.',
+            'file.required' => 'An import file is required.',
+            'file.mimes'    => 'File must be in CSV, XLSX, or XLS format.',
+            'file.max'      => 'File size must not exceed 10MB.',
         ];
     }
 }

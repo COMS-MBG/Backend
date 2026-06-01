@@ -1,13 +1,11 @@
 <?php
 
-namespace App\Services\SPPG;
+namespace App\Services\Distribution;
 
 use App\Events\Distribution\CourierTaskSubmitted;
 use App\Events\Distribution\DeliveryStatusUpdated;
 use App\Models\DeliveryHistory;
 use App\Models\DeliverySchedule;
-use App\Models\Employee;
-use App\Models\School;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
@@ -29,7 +27,7 @@ class DeliveryScheduleService
             'status'         => DeliverySchedule::STATUS_IN_ORDER,
         ]);
 
-        return $schedule->load(['courier.user', 'school', 'assignedBy']);
+        return $schedule->load(['courier', 'school', 'assignedBy']);
     }
 
     public function updateSchedule(DeliverySchedule $schedule, array $data): DeliverySchedule
@@ -37,36 +35,38 @@ class DeliveryScheduleService
         abort_unless($schedule->isEditable(), 422, 'Schedule cannot be edited in its current status.');
 
         $schedule->update([
-            'courier_id'     => $data['courier_id'] ?? $schedule->courier_id,
-            'school_id'      => $data['school_id'] ?? $schedule->school_id,
-            'vehicle_type'   => $data['vehicle_type'] ?? $schedule->vehicle_type,
-            'vehicle_plate'  => $data['vehicle_plate'] ?? $schedule->vehicle_plate,
-            'scheduled_at'   => $data['scheduled_at'] ?? $schedule->scheduled_at,
+            'courier_id'     => $data['courier_id']     ?? $schedule->courier_id,
+            'school_id'      => $data['school_id']      ?? $schedule->school_id,
+            'vehicle_type'   => $data['vehicle_type']   ?? $schedule->vehicle_type,
+            'vehicle_plate'  => $data['vehicle_plate']  ?? $schedule->vehicle_plate,
+            'scheduled_at'   => $data['scheduled_at']   ?? $schedule->scheduled_at,
             'delivery_notes' => $data['delivery_notes'] ?? $schedule->delivery_notes,
         ]);
 
-        return $schedule->fresh(['courier.user', 'school', 'assignedBy']);
+        return $schedule->fresh(['courier', 'school', 'assignedBy']);
     }
 
     // ─── Admin SPPG: submit task to courier ──────────────────────────────────
+    // BUG FIX: sebelumnya status di-set ulang ke STATUS_IN_ORDER (redundan).
+    // Sekarang: tandai submitted_by, broadcast ke kurir, status tetap in_order
+    // agar acceptTask() & rejectTask() bisa memproses dengan benar.
 
     public function submitTask(DeliverySchedule $schedule, int $adminSppgId): DeliverySchedule
     {
         abort_unless(
             $schedule->status === DeliverySchedule::STATUS_IN_ORDER,
             422,
-            'Only in_order tasks can be submitted.'
+            'Only in_order tasks can be submitted to a courier.'
         );
 
         $schedule->update([
             'submitted_by' => $adminSppgId,
-            'status'       => DeliverySchedule::STATUS_IN_ORDER,
         ]);
 
-        // Broadcast to courier via Laravel Reverb
-        broadcast(new CourierTaskSubmitted($schedule))->toOthers();
+        // Broadcast ke kurir via Laravel Reverb
+        broadcast(new CourierTaskSubmitted($schedule->fresh(['school', 'courier'])))->toOthers();
 
-        return $schedule->fresh(['courier.user', 'school']);
+        return $schedule->fresh(['courier', 'school', 'submittedBy']);
     }
 
     // ─── Courier: accept task ─────────────────────────────────────────────────
@@ -108,10 +108,10 @@ class DeliveryScheduleService
         }
 
         $schedule->update([
-            'status'              => DeliverySchedule::STATUS_REJECTED,
-            'rejection_reason'    => $reason,
-            'rejection_photo_path'=> $photoPath,
-            'rejected_at'         => now(),
+            'status'               => DeliverySchedule::STATUS_REJECTED,
+            'rejection_reason'     => $reason,
+            'rejection_photo_path' => $photoPath,
+            'rejected_at'          => now(),
         ]);
 
         broadcast(new DeliveryStatusUpdated($schedule))->toOthers();
@@ -159,7 +159,8 @@ class DeliveryScheduleService
         );
 
         return DB::transaction(function () use ($schedule, $adminId, $notes) {
-            // Update schedule
+            $schedule->load(['courier', 'school']);
+
             $schedule->update([
                 'status'             => DeliverySchedule::STATUS_CONFIRMED,
                 'confirmed_by'       => $adminId,
@@ -167,14 +168,14 @@ class DeliveryScheduleService
                 'confirmation_notes' => $notes,
             ]);
 
-            // Archive into delivery_histories
+            // BUG FIX: School pakai kolom 'nama' dan 'alamat' (bukan 'name'/'address')
             $history = DeliveryHistory::create([
                 'delivery_schedule_id' => $schedule->id,
                 'courier_id'           => $schedule->courier_id,
                 'school_id'            => $schedule->school_id,
-                'courier_name'         => $schedule->courier->full_name ?? $schedule->courier->name,
-                'school_name'          => $schedule->school->name,
-                'school_address'       => $schedule->school->address ?? null,
+                'courier_name'         => $schedule->courier->name ?? '',
+                'school_name'          => $schedule->school->nama  ?? '',
+                'school_address'       => $schedule->school->alamat ?? null,
                 'vehicle_type'         => $schedule->vehicle_type,
                 'vehicle_plate'        => $schedule->vehicle_plate,
                 'departed_at'          => $schedule->departed_at,
@@ -214,7 +215,7 @@ class DeliveryScheduleService
 
         broadcast(new DeliveryStatusUpdated($schedule))->toOthers();
 
-        return $schedule->fresh(['courier.user']);
+        return $schedule->fresh(['courier']);
     }
 
     // ─── Courier: resubmit after revision request ─────────────────────────────
@@ -229,7 +230,6 @@ class DeliveryScheduleService
             'Proof can only be resubmitted when revision is required.'
         );
 
-        // Delete old photo
         if ($schedule->proof_photo_path) {
             Storage::disk('public')->delete($schedule->proof_photo_path);
         }
@@ -262,8 +262,8 @@ class DeliveryScheduleService
 
         for ($i = 0; $i < count($coords) - 1; $i++) {
             $totalKm += $this->haversine(
-                $coords[$i][1],   // lat
-                $coords[$i][0],   // lon
+                $coords[$i][1],       // lat
+                $coords[$i][0],       // lon
                 $coords[$i + 1][1],
                 $coords[$i + 1][0]
             );

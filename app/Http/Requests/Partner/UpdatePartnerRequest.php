@@ -17,21 +17,35 @@ class UpdatePartnerRequest extends FormRequest
         $partnerId = $this->route('partner') ?? $this->route('id');
 
         return [
-            'nama_sekolah'   => 'sometimes|required|string|max:255',
-            'npsn'           => [
+            'school_name'      => 'sometimes|required|string|max:255',
+            'npsn'             => [
                 'nullable',
                 'string',
                 'max:50',
                 Rule::unique('partners', 'npsn')->ignore($partnerId),
             ],
-            'bentuk'         => 'sometimes|required|string|in:SD,SMP,SMA,SMK,MI,MTs,MA,MAK',
-            'status'         => 'sometimes|required|string|in:Negeri,Swasta',
-            'alamat'         => 'nullable|string',
-            'kecamatan'      => 'nullable|string|max:100',
-            'kabupaten_kota' => 'nullable|string|max:100',
-            'latitude'       => 'nullable|numeric|between:-90,90',
-            'longitude'      => 'nullable|numeric|between:-180,180',
-            'jumlah_porsi'   => 'sometimes|required|integer|min:0',
+            'school_type'      => 'sometimes|required|string|in:SD,SMP,SMA,SMK,MI,MTs,MA,MAK',
+            'ownership_status' => 'sometimes|required|string|in:public,private',
+            'address'          => 'nullable|string',
+            'district'         => 'nullable|string|max:100',
+            'city'             => 'nullable|string|max:100',
+            'latitude'         => 'nullable|numeric|between:-90,90',
+            'longitude'        => 'nullable|numeric|between:-180,180',
+            'portion_count'    => 'sometimes|required|integer|min:0',
+        ];
+    }
+
+    public function messages(): array
+    {
+        return [
+            'school_name.required'      => 'School name is required.',
+            'school_type.required'      => 'School type is required.',
+            'school_type.in'            => 'Invalid school type. Must be one of: SD, SMP, SMA, SMK, MI, MTs, MA, MAK.',
+            'ownership_status.required' => 'Ownership status is required.',
+            'ownership_status.in'       => 'Ownership status must be either public or private.',
+            'npsn.unique'               => 'This NPSN is already registered.',
+            'portion_count.required'    => 'Portion count is required.',
+            'portion_count.min'         => 'Portion count cannot be negative.',
         ];
     }
 }

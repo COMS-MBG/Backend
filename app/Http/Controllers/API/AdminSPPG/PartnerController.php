@@ -20,7 +20,7 @@ class PartnerController extends Controller
     public function index(Request $request): JsonResponse
     {
         $partners = $this->partnerService->getAll(
-            $request->only(['bentuk', 'status', 'kecamatan', 'kabupaten_kota', 'search']),
+            $request->only(['school_type', 'ownership_status', 'district', 'city', 'search']),
             $request->integer('per_page', 15),
         );
 
@@ -66,7 +66,7 @@ class PartnerController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Partner sekolah berhasil ditambahkan.',
+            'message' => 'Partner school created successfully.',
             'data'    => new PartnerResource($partner),
         ], 201);
     }
@@ -79,7 +79,7 @@ class PartnerController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Partner sekolah berhasil diperbarui.',
+            'message' => 'Partner school updated successfully.',
             'data'    => new PartnerResource($partner),
         ]);
     }
@@ -92,7 +92,7 @@ class PartnerController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Partner sekolah berhasil dihapus.',
+            'message' => 'Partner school deleted successfully.',
         ]);
     }
 
@@ -106,7 +106,7 @@ class PartnerController extends Controller
         if (empty($result['success'])) {
             return response()->json([
                 'success'          => false,
-                'message'          => $result['errors'][0] ?? 'Import gagal.',
+                'message'          => $result['errors'][0] ?? 'Import failed.',
                 'errors'           => $result['errors'] ?? [],
                 'missing_columns'  => $result['missing_columns'] ?? [],
                 'detected_columns' => $result['detected_columns'] ?? [],
@@ -115,7 +115,7 @@ class PartnerController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => "Import selesai: {$result['created']} ditambahkan, {$result['updated']} diperbarui, {$result['skipped']} dilewati.",
+            'message' => "Import complete: {$result['created']} created, {$result['updated']} updated, {$result['skipped']} skipped.",
             'data'    => $result,
         ]);
     }

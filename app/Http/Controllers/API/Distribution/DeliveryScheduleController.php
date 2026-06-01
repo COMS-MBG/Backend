@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Api\Distribution;
+namespace App\Http\Controllers\API\Distribution;
 
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Distribution\ConfirmDeliveryRequest;
@@ -11,6 +11,7 @@ use App\Http\Requests\Distribution\UpdateDeliveryScheduleRequest;
 use App\Http\Resources\Distribution\DeliveryHistoryResource;
 use App\Http\Resources\Distribution\DeliveryScheduleResource;
 use App\Models\DeliverySchedule;
+use App\Models\Employee;
 use App\Services\Distribution\DeliveryScheduleService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -20,8 +21,8 @@ use Illuminate\Http\Request;
  *  DELIVERY SCHEDULE CONTROLLER
  * ============================================================
  *
- * "PINTU MASUK"  = POST/PUT routes below  (data dari FE → DB)
- * "PINTU KELUAR" = GET routes below       (data dari DB → FE)
+ * "PINTU MASUK"  = POST/PUT routes (data dari FE → DB)
+ * "PINTU KELUAR" = GET routes       (data dari DB → FE)
  *
  * Base path: /api/distribution/schedules
  * ============================================================
@@ -40,14 +41,24 @@ class DeliveryScheduleController extends Controller
             ->with(['courier', 'school', 'assignedBy', 'submittedBy', 'latestLocation'])
             ->latest();
 
-        // Filter by courier (courier role sees only their own)
-        if ($request->user()->hasRole('courier')) {
+        // Kurir hanya melihat jadwal miliknya sendiri
+        if ($request->user()->hasAnyRole(['courier'])) {
             $query->forCourier($request->user()->employee?->id ?? 0);
         }
 
-        // Optional filter by status
+        // Filter opsional by status
         if ($request->filled('status')) {
             $query->where('status', $request->status);
+        }
+
+        // Filter opsional by courier
+        if ($request->filled('courier_id') && !$request->user()->hasAnyRole(['courier'])) {
+            $query->where('courier_id', $request->courier_id);
+        }
+
+        // Filter opsional by school
+        if ($request->filled('school_id')) {
+            $query->where('school_id', $request->school_id);
         }
 
         $schedules = $query->paginate($request->integer('per_page', 15));
@@ -75,7 +86,7 @@ class DeliveryScheduleController extends Controller
         ]);
     }
 
-    // ─── [POST] Admin Logistik creates a schedule ─────────────────────────────
+    // ─── [POST] Admin Logistik membuat jadwal ─────────────────────────────────
     // PINTU MASUK
     public function store(StoreDeliveryScheduleRequest $request): JsonResponse
     {
@@ -88,7 +99,7 @@ class DeliveryScheduleController extends Controller
         ], 201);
     }
 
-    // ─── [PUT] Admin Logistik updates draft schedule ──────────────────────────
+    // ─── [PUT] Admin Logistik update jadwal draft ──────────────────────────────
     // PINTU MASUK
     public function update(UpdateDeliveryScheduleRequest $request, DeliverySchedule $schedule): JsonResponse
     {
@@ -101,7 +112,7 @@ class DeliveryScheduleController extends Controller
         ]);
     }
 
-    // ─── [DELETE] Admin Logistik deletes an in_order schedule ─────────────────
+    // ─── [DELETE] Admin Logistik hapus jadwal in_order ─────────────────────────
     public function destroy(Request $request, DeliverySchedule $schedule): JsonResponse
     {
         abort_unless($request->user()->hasAnyRole(['admin_logistik', 'super_admin']), 403);
@@ -116,8 +127,8 @@ class DeliveryScheduleController extends Controller
     //  WORKFLOW ACTIONS
     // ═══════════════════════════════════════════════════════════════
 
-    // ─── [POST] Admin SPPG submits task to courier ────────────────────────────
-    // PINTU MASUK → triggers Reverb broadcast to courier
+    // ─── [POST] Admin SPPG submit tugas ke kurir ─────────────────────────────
+    // PINTU MASUK → trigger Reverb broadcast ke kurir
     public function submitTask(Request $request, DeliverySchedule $schedule): JsonResponse
     {
         abort_unless($request->user()->hasAnyRole(['admin_sppg', 'super_admin']), 403);
@@ -131,7 +142,7 @@ class DeliveryScheduleController extends Controller
         ]);
     }
 
-    // ─── [POST] Courier accepts task ─────────────────────────────────────────
+    // ─── [POST] Kurir menerima tugas ─────────────────────────────────────────
     // PINTU MASUK
     public function acceptTask(Request $request, DeliverySchedule $schedule): JsonResponse
     {
@@ -146,7 +157,7 @@ class DeliveryScheduleController extends Controller
         ]);
     }
 
-    // ─── [POST] Courier rejects task + reason + optional photo ───────────────
+    // ─── [POST] Kurir menolak tugas + alasan + foto opsional ─────────────────
     // PINTU MASUK
     public function rejectTask(RejectDeliveryRequest $request, DeliverySchedule $schedule): JsonResponse
     {
@@ -163,7 +174,7 @@ class DeliveryScheduleController extends Controller
         ]);
     }
 
-    // ─── [POST] Courier submits delivery proof photo ─────────────────────────
+    // ─── [POST] Kurir submit foto bukti pengiriman ────────────────────────────
     // PINTU MASUK
     public function submitProof(SubmitDeliveryProofRequest $request, DeliverySchedule $schedule): JsonResponse
     {
@@ -176,7 +187,7 @@ class DeliveryScheduleController extends Controller
         ]);
     }
 
-    // ─── [POST] Courier resubmits proof after revision request ───────────────
+    // ─── [POST] Kurir resubmit bukti setelah diminta revisi ──────────────────
     // PINTU MASUK
     public function resubmitProof(SubmitDeliveryProofRequest $request, DeliverySchedule $schedule): JsonResponse
     {
@@ -189,8 +200,8 @@ class DeliveryScheduleController extends Controller
         ]);
     }
 
-    // ─── [POST] Admin Logistik confirms delivery ──────────────────────────────
-    // PINTU MASUK → archives to delivery_histories
+    // ─── [POST] Admin Logistik konfirmasi pengiriman ──────────────────────────
+    // PINTU MASUK → arsip ke delivery_histories
     public function confirmDelivery(ConfirmDeliveryRequest $request, DeliverySchedule $schedule): JsonResponse
     {
         $history = $this->service->confirmDelivery(
@@ -206,8 +217,8 @@ class DeliveryScheduleController extends Controller
         ]);
     }
 
-    // ─── [POST] Admin Logistik requests revision ──────────────────────────────
-    // PINTU MASUK → sends notification to courier
+    // ─── [POST] Admin Logistik minta revisi bukti ─────────────────────────────
+    // PINTU MASUK → notifikasi ke kurir
     public function requestRevision(Request $request, DeliverySchedule $schedule): JsonResponse
     {
         abort_unless($request->user()->hasAnyRole(['admin_logistik', 'super_admin']), 403);
@@ -223,22 +234,31 @@ class DeliveryScheduleController extends Controller
         ]);
     }
 
-    // ─── [GET] Available couriers (employees) for assignment ─────────────────
-    // PINTU KELUAR – used by admin logistik dropdown
+    // ─── [GET] Daftar kurir tersedia untuk dipilih admin logistik ─────────────
+    // PINTU KELUAR – dropdown di FE saat membuat jadwal
+    // BUG FIX: query lama pakai kolom 'role' yang tidak ada, orWhereHas tidak valid.
+    // Sekarang: cukup filter by position='kurir' atau role slug='kurir'
     public function availableCouriers(Request $request): JsonResponse
     {
         abort_unless($request->user()->hasAnyRole(['admin_logistik', 'super_admin', 'admin_sppg']), 403);
 
-        // Fetch from Employee model – adjust column names to your actual schema
-        $couriers = \App\Models\Employee::query()
-            ->where('role', 'courier')
-            ->orWhereHas('user', fn($q) => $q->role('courier'))
-            ->select(['id', 'name', 'full_name', 'employee_number'])
+        $couriers = Employee::query()
+            ->where(function ($q) {
+                // Filter kurir berdasarkan jabatan struktural
+                $q->where('position', 'kurir')
+                  // ATAU berdasarkan slug role RBAC
+                  ->orWhereHas('role', fn($rq) => $rq->where('slug', 'kurir'));
+            })
+            ->where('status', 'active')
+            ->whereNotNull('user_id') // harus punya akun agar bisa menerima notifikasi
+            ->select(['id', 'name', 'phone', 'position'])
             ->orderBy('name')
             ->get()
             ->map(fn($e) => [
-                'id'   => $e->id,
-                'name' => $e->full_name ?? $e->name,
+                'id'       => $e->id,
+                'name'     => $e->name,
+                'phone'    => $e->phone,
+                'position' => $e->position,
             ]);
 
         return response()->json(['success' => true, 'data' => $couriers]);
