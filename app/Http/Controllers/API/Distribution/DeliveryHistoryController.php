@@ -25,7 +25,8 @@ class DeliveryHistoryController extends Controller
     public function index(Request $request): JsonResponse
     {
         $query = DeliveryHistory::with(['confirmedBy'])
-            ->latest('departed_at');
+            ->whereNotNull('confirmed_at')
+            ->latest('confirmed_at');
 
         // Kurir hanya melihat riwayat miliknya sendiri
         // BUG FIX: hasRole() → hasAnyRole()
@@ -44,11 +45,11 @@ class DeliveryHistoryController extends Controller
         }
 
         if ($request->filled('date_from')) {
-            $query->whereDate('departed_at', '>=', $request->date_from);
+            $query->whereDate('confirmed_at', '>=', $request->date_from);
         }
 
         if ($request->filled('date_to')) {
-            $query->whereDate('departed_at', '<=', $request->date_to);
+            $query->whereDate('confirmed_at', '<=', $request->date_to);
         }
 
         $histories = $query->paginate($request->integer('per_page', 15));
@@ -60,6 +61,7 @@ class DeliveryHistoryController extends Controller
                 'current_page' => $histories->currentPage(),
                 'last_page'    => $histories->lastPage(),
                 'total'        => $histories->total(),
+                'per_page'     => $histories->perPage(),
             ],
         ]);
     }
@@ -84,10 +86,12 @@ class DeliveryHistoryController extends Controller
             403
         );
 
-        $from = $request->date('date_from', now()->startOfMonth());
-        $to   = $request->date('date_to',   now()->endOfMonth());
+        $from = $request->filled('date_from') ? \Illuminate\Support\Carbon::parse($request->date_from) : now()->startOfMonth();
+        $to   = $request->filled('date_to') ? \Illuminate\Support\Carbon::parse($request->date_to) : now()->endOfMonth();
 
-        $histories = DeliveryHistory::whereBetween('departed_at', [$from, $to])->get();
+        $histories = DeliveryHistory::whereNotNull('confirmed_at')
+            ->whereBetween('confirmed_at', [$from, $to])
+            ->get();
 
         return response()->json([
             'success' => true,

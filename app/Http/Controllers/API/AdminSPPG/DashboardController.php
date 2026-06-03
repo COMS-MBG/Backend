@@ -33,10 +33,11 @@ class DashboardController extends Controller
         ];
 
         // ── Statistik Riwayat Bulan Ini ──────────────────────────────────────
-        $historyThisMonth = DeliveryHistory::whereBetween('departed_at', [
-            now()->startOfMonth(),
-            now()->endOfMonth(),
-        ])->get();
+        $historyThisMonth = DeliveryHistory::whereNotNull('confirmed_at')
+            ->whereBetween('confirmed_at', [
+                now()->startOfMonth(),
+                now()->endOfMonth(),
+            ])->get();
 
         $historyStats = [
             'total_deliveries'     => $historyThisMonth->count(),

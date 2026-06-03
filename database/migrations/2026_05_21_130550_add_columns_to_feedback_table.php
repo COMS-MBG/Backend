@@ -12,11 +12,21 @@ return new class extends Migration
     public function up(): void
     {
         Schema::table('feedback', function (Blueprint $table) {
-            $table->string('name')->after('id');
-            $table->string('role')->nullable()->after('name');
-            $table->text('message')->after('role');
-            $table->unsignedTinyInteger('rating')->default(5)->after('message');
-            $table->boolean('is_approved')->default(false)->after('rating');
+            if (!Schema::hasColumn('feedback', 'name')) {
+                $table->string('name')->after('id');
+            }
+            if (!Schema::hasColumn('feedback', 'role')) {
+                $table->string('role')->nullable()->after('name');
+            }
+            if (!Schema::hasColumn('feedback', 'message')) {
+                $table->text('message')->after('role');
+            }
+            if (!Schema::hasColumn('feedback', 'rating')) {
+                $table->unsignedTinyInteger('rating')->default(5)->after('message');
+            }
+            if (!Schema::hasColumn('feedback', 'is_approved')) {
+                $table->boolean('is_approved')->default(false)->after('rating');
+            }
         });
     }
 
@@ -26,7 +36,15 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('feedback', function (Blueprint $table) {
-            $table->dropColumn(['name', 'role', 'message', 'rating', 'is_approved']);
+            $drop = [];
+            if (Schema::hasColumn('feedback', 'name')) $drop[] = 'name';
+            if (Schema::hasColumn('feedback', 'role')) $drop[] = 'role';
+            if (Schema::hasColumn('feedback', 'message')) $drop[] = 'message';
+            if (Schema::hasColumn('feedback', 'rating')) $drop[] = 'rating';
+            if (Schema::hasColumn('feedback', 'is_approved')) $drop[] = 'is_approved';
+            if (!empty($drop)) {
+                $table->dropColumn($drop);
+            }
         });
     }
 };
