@@ -3,12 +3,17 @@
 namespace App\Http\Controllers\API\AdminSPPG;
 
 use App\Http\Controllers\Controller;
+use App\Models\ShippingRate;
+use App\Services\SPPG\ReportService;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controllers\HasMiddleware;
 use Illuminate\Routing\Controllers\Middleware;
 
 class FinancialReportController extends Controller implements HasMiddleware
 {
+    public function __construct(private readonly ReportService $reportService) {}
+
     public static function middleware(): array
     {
         return [
@@ -35,26 +40,38 @@ class FinancialReportController extends Controller implements HasMiddleware
     }
 
     /**
-     * Display the specified resource.
+     * GET /api/admin-sppg/reports/financial/rates
+     * Return all configured shipping rates.
      */
-    public function show(string $id)
+    public function rates(): JsonResponse
     {
-        //
+        $rates = ShippingRate::orderBy('vehicle_type')->get();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $rates,
+        ]);
     }
 
     /**
-     * Update the specified resource in storage.
+     * PUT /api/admin-sppg/reports/financial/rates/{vehicleType}
+     * Update rate per km for a vehicle type.
      */
-    public function update(Request $request, string $id)
+    public function updateRate(Request $request, string $vehicleType): JsonResponse
     {
-        //
-    }
+        $request->validate([
+            'rate_per_km' => 'required|numeric|min:0',
+            'is_active'   => 'nullable|boolean',
+            'notes'       => 'nullable|string|max:255',
+        ]);
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        $rate = ShippingRate::where('vehicle_type', $vehicleType)->firstOrFail();
+        $rate->update($request->only(['rate_per_km', 'is_active', 'notes']));
+
+        return response()->json([
+            'success' => true,
+            'message' => 'Shipping rate updated.',
+            'data'    => $rate->fresh(),
+        ]);
     }
 }

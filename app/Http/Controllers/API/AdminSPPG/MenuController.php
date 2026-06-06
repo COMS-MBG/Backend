@@ -38,11 +38,11 @@ class MenuController extends Controller implements HasMiddleware
     public function index(Request $request): JsonResponse
     {
         $filters = $request->only(['search', 'status', 'per_page']);
-        $menus   = $this->menuService->getAll($filters);
+        $menus   = $this->menuService->getAll($filters, $request->user()->sppg_id);
 
         return response()->json([
             'success' => true,
-            'message' => 'Daftar perencanaan menu berhasil diambil.',
+            'message' => 'Menu planning list fetched successfully.',
             'data'    => MenuResource::collection($menus->items()),
             'meta'    => [
                 'current_page' => $menus->currentPage(),
@@ -116,7 +116,9 @@ class MenuController extends Controller implements HasMiddleware
     public function store(MenuRequest $request): JsonResponse
     {
         try {
-            $menu = $this->menuService->create($request->validated());
+            $data           = $request->validated();
+            $data['sppg_id'] = $request->user()->sppg_id;
+            $menu = $this->menuService->create($data);
 
             return response()->json([
                 'success' => true,

@@ -18,9 +18,13 @@ class MenuService
      *
      * PINTU TARIK DATA: GET /api/menus
      */
-    public function getAll(array $filters = [])
+    public function getAll(array $filters = [], ?int $sppgId = null)
     {
         $query = Menu::with(['menuItems.recipe']);
+
+        if ($sppgId) {
+            $query->where('sppg_id', $sppgId);
+        }
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -91,6 +95,7 @@ class MenuService
         $status = Menu::computeStatus($data['week_start']);
 
         $menu = Menu::create([
+            'sppg_id'    => $data['sppg_id'] ?? null,
             'name'       => $data['name'],
             'week_start' => $data['week_start'],
             'week_end'   => $data['week_end'],

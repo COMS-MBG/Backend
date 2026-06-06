@@ -13,6 +13,7 @@ use App\Http\Controllers\API\AdminSPPG\CourierTrackingController;
 use App\Http\Controllers\API\AdminSPPG\DashboardController;
 use App\Http\Controllers\API\AdminSPPG\DistributionMapController;
 use App\Http\Controllers\API\AdminSPPG\FinancialReportController;
+use App\Http\Controllers\API\AdminSPPG\OperationalReportController;
 use App\Http\Controllers\API\AdminSPPG\PartnerController;
 use App\Http\Controllers\API\AdminSPPG\RoleController;
 use App\Http\Controllers\API\AdminSPPG\PermissionController;
@@ -139,15 +140,17 @@ Route::middleware(['auth:sanctum'])
     Route::get('maps/distribution', [DistributionMapController::class, 'index'])
         ->middleware('permission:distribution.read');
 
-    // ── Laporan / Financial Reports ───────────────────────────────────────────
-    Route::middleware('permission:report.read')->group(function () {
-        Route::get('financial-reports',                          [FinancialReportController::class, 'index']);
-        Route::get('financial-reports/{financial_report}',       [FinancialReportController::class, 'show']);
+    // ── Laporan Operasional ────────────────────────────────────────────────────
+    Route::get('reports/operational', [OperationalReportController::class, 'index'])
+        ->middleware('permission:report.read');
+
+    // ── Laporan Keuangan (Delivery Cost) ──────────────────────────────────────
+    Route::prefix('reports/financial')->group(function () {
+        Route::get('/',                         [FinancialReportController::class, 'index'])
+            ->middleware('permission:report.read');
+        Route::get('/rates',                    [FinancialReportController::class, 'rates'])
+            ->middleware('permission:report.read');
+        Route::put('/rates/{vehicleType}',      [FinancialReportController::class, 'updateRate'])
+            ->middleware('permission:report.update');
     });
-    Route::post('financial-reports', [FinancialReportController::class, 'store'])
-        ->middleware('permission:report.create');
-    Route::match(['put', 'patch'], 'financial-reports/{financial_report}', [FinancialReportController::class, 'update'])
-        ->middleware('permission:report.update');
-    Route::delete('financial-reports/{financial_report}', [FinancialReportController::class, 'destroy'])
-        ->middleware('permission:report.delete');
 });

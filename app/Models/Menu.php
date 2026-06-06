@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\MenuItem;
+use App\Models\SPPG;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -19,6 +20,7 @@ class Menu extends Model
     protected $table = 'menus';
 
     protected $fillable = [
+        'sppg_id',
         'name',
         'week_start',
         'week_end',
@@ -34,6 +36,12 @@ class Menu extends Model
     // =============================================
     // RELATIONSHIPS
     // =============================================
+
+    public function sppg()
+    {
+        return $this->belongsTo(SPPG::class, 'sppg_id');
+    }
+
 
     /**
      * Menu ini punya item (resep per hari) apa saja

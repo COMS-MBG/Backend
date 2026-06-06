@@ -40,7 +40,7 @@ class RoleSeeder extends Seeder
                     'dashboard.read',
                     'distribution.create', 'distribution.read', 'distribution.update', 'distribution.delete',
                     'partner.read',
-                    'report.read',
+                    'report.read', 'report.update',
                 ],
             ],
             'Kurir' => [

@@ -44,7 +44,7 @@ class DefaultRolePermissionSeeder extends Seeder
                     'dashboard.read',
                     'stock.read', 'stock.create', 'stock.update', 'stock.delete', 'stock.approve',
                     'distribution.read', 'distribution.create', 'distribution.update', 'distribution.delete',
-                    'report.read',
+                    'report.read', 'report.update',
                 ],
             ],
             'Courier' => [

@@ -115,11 +115,7 @@ class DeliveryScheduleController extends Controller
     // ─── [DELETE] Admin Logistik hapus jadwal in_order ─────────────────────────
     public function destroy(Request $request, DeliverySchedule $schedule): JsonResponse
     {
-<<<<<<< Updated upstream
-        abort_unless($request->user()->hasAnyRole(['admin_logistik', 'super_admin', 'admin_sppg']), 403);
-=======
         abort_unless($request->user()->hasAnyRole(['logistics_admin', 'super_admin']), 403);
->>>>>>> Stashed changes
         abort_unless($schedule->status === DeliverySchedule::STATUS_IN_ORDER, 422, 'Only in_order schedules can be deleted.');
 
         $schedule->delete();
@@ -225,11 +221,7 @@ class DeliveryScheduleController extends Controller
     // PINTU MASUK → notifikasi ke kurir
     public function requestRevision(Request $request, DeliverySchedule $schedule): JsonResponse
     {
-<<<<<<< Updated upstream
-        abort_unless($request->user()->hasAnyRole(['admin_logistik', 'super_admin', 'admin_sppg']), 403);
-=======
         abort_unless($request->user()->hasAnyRole(['logistics_admin', 'super_admin']), 403);
->>>>>>> Stashed changes
 
         $request->validate(['notes' => 'required|string|min:5|max:500']);
 
