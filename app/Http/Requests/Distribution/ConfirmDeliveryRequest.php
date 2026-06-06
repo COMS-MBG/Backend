@@ -8,8 +8,8 @@ class ConfirmDeliveryRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAnyRole(['admin_logistik', 'super_admin', 'admin_sppg']) ?? false;
-    }
+        return $this->user()?->hasAnyRole(['admin_logistik', 'admin_sppg']) ?? false;
+  }
 
     public function rules(): array
     {

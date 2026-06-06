@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Services\School;
 
@@ -11,7 +11,7 @@ class SchoolService
     {
         $query = School::with('sppg');
 
-        // Batasi per SPPG kalau admin SPPG yang akses
+        // Limit to SPPG if admin SPPG is accessing
         if ($sppgId) {
             $query->where('sppg_id', $sppgId);
         }
@@ -19,20 +19,20 @@ class SchoolService
         if (!empty($filters['sppg_id'])) {
             $query->where('sppg_id', $filters['sppg_id']);
         }
-        if (!empty($filters['jenjang'])) {
-            $query->where('jenjang', $filters['jenjang']);
+        if (!empty($filters['school_level'])) {
+            $query->where('school_level', $filters['school_level']);
         }
-        if (!empty($filters['kota'])) {
-            $query->where('kota', 'ilike', "%{$filters['kota']}%");
+        if (!empty($filters['city'])) {
+            $query->where('city', 'like', "%{$filters['city']}%");
         }
         if (!empty($filters['search'])) {
-            $query->where('nama', 'ilike', "%{$filters['search']}%");
+            $query->where('name', 'like', "%{$filters['search']}%");
         }
-        if (isset($filters['tanpa_sppg']) && $filters['tanpa_sppg']) {
+        if (isset($filters['without_sppg']) && $filters['without_sppg']) {
             $query->whereNull('sppg_id');
         }
 
-        return $query->orderBy('nama')->paginate($perPage);
+        return $query->orderBy('name')->paginate($perPage);
     }
 
     public function findById(string $id, ?string $sppgId = null): School

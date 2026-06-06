@@ -168,14 +168,14 @@ class DeliveryScheduleService
                 'confirmation_notes' => $notes,
             ]);
 
-            // BUG FIX: School pakai kolom 'nama' dan 'alamat' (bukan 'name'/'address')
+            // Create delivery history snapshot
             $history = DeliveryHistory::create([
                 'delivery_schedule_id' => $schedule->id,
                 'courier_id'           => $schedule->courier_id,
                 'school_id'            => $schedule->school_id,
                 'courier_name'         => $schedule->courier->name ?? '',
-                'school_name'          => $schedule->school->nama  ?? '',
-                'school_address'       => $schedule->school->alamat ?? null,
+                'school_name'          => $schedule->school->name    ?? '',
+                'school_address'       => $schedule->school->address ?? null,
                 'vehicle_type'         => $schedule->vehicle_type,
                 'vehicle_plate'        => $schedule->vehicle_plate,
                 'departed_at'          => $schedule->departed_at,

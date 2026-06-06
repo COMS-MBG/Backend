@@ -3,13 +3,15 @@
 use App\Http\Controllers\API\SuperAdmin\EmployeeController;
 use App\Http\Controllers\API\SuperAdmin\SchoolController;
 use App\Http\Controllers\API\SuperAdmin\SPPGController;
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\API\SuperAdmin\FinancialReportController;
-
+use App\Http\Controllers\API\SuperAdmin\DashboardController;
+use App\Http\Controllers\API\SuperAdmin\SppgSubmissionController;
+use App\Http\Controllers\API\SuperAdmin\MapController;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
-| Super Admin Routes — Phase 2
+| Super Admin Routes
 | Prefix  : /api/super-admin
 | Middleware: auth:sanctum + role:super_admin
 |--------------------------------------------------------------------------
@@ -18,6 +20,9 @@ use App\Http\Controllers\API\SuperAdmin\FinancialReportController;
 Route::middleware(['auth:sanctum', 'role:super_admin'])
     ->prefix('super-admin')
     ->group(function () {
+
+    // ── Dashboard ──────────────────────────────────────────────────────────────
+    Route::get('/dashboard',                      [DashboardController::class, 'index']);
 
     // ── SPPG ───────────────────────────────────────────────────────────────────
     Route::prefix('sppg')->group(function () {
@@ -30,6 +35,12 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])
         Route::post('/{sppgId}/assign-school',    [SPPGController::class, 'assignSchool']);
         Route::delete('/{sppgId}/schools/{schoolId}', [SPPGController::class, 'detachSchool']);
 
+        // Activation, partners, and menus
+        Route::post('/{id}/deactivate',           [SPPGController::class, 'deactivate']);
+        Route::post('/{id}/activate',             [SPPGController::class, 'activate']);
+        Route::get('/{id}/partners',              [SPPGController::class, 'partners']);
+        Route::get('/{id}/menus',                 [SPPGController::class, 'menus']);
+
         // Karyawan per SPPG
         Route::get('/{sppgId}/employees',         [EmployeeController::class, 'index']);
         Route::post('/{sppgId}/employees',        [EmployeeController::class, 'store']);
@@ -38,11 +49,32 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])
         Route::delete('/{sppgId}/employees/{id}', [EmployeeController::class, 'destroy']);
     });
 
+    // ── SPPG Submissions (Drafts) ──────────────────────────────────────────────
+    Route::prefix('sppg-submissions')->group(function () {
+        Route::get('/',                           [SppgSubmissionController::class, 'index']);
+        Route::post('/',                          [SppgSubmissionController::class, 'store']);
+        Route::get('/{id}',                       [SppgSubmissionController::class, 'show']);
+        Route::put('/{id}',                       [SppgSubmissionController::class, 'update']);
+        Route::delete('/{id}',                    [SppgSubmissionController::class, 'destroy']);
+        Route::post('/{id}/submit',               [SppgSubmissionController::class, 'submit']);
+    });
+
+    // ── GIS Maps & Analytics ───────────────────────────────────────────────────
+    Route::prefix('map')->group(function () {
+        Route::get('/data',                       [MapController::class, 'getMapData']);
+        Route::get('/sppg-layers',                 [MapController::class, 'getSppgLayers']);
+        Route::get('/submission-layers',          [MapController::class, 'getSubmissionLayers']);
+        Route::get('/recommendations',            [MapController::class, 'getRecommendations']);
+        Route::post('/geocode',                   [MapController::class, 'geocode']);
+        Route::post('/route-check',               [MapController::class, 'routeCheck']);
+        Route::post('/validate-point',            [MapController::class, 'validatePoint']);
+        Route::post('/suggest-shift',             [MapController::class, 'suggestShift']);
+        Route::post('/confirm-point/{submission_id}', [MapController::class, 'confirmPoint']);
+    });
+
     // ── Schools ────────────────────────────────────────────────────────────────
     Route::apiResource('schools', SchoolController::class);
 
-    Route::apiResource(
-            'financial-reports',
-            FinancialReportController::class
-        );
+    // ── Financial Reports ──────────────────────────────────────────────────────
+    Route::apiResource('financial-reports', FinancialReportController::class);
 });

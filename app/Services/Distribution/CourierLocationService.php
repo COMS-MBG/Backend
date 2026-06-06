@@ -43,7 +43,6 @@ class CourierLocationService
 
     /**
      * Get the latest known location of every active courier.
-     * BUG FIX: kolom School adalah 'nama', bukan 'name'.
      */
     public function getActiveCourierLocations(): array
     {
@@ -51,7 +50,7 @@ class CourierLocationService
             ->with([
                 'latestLocation',
                 'courier:id,name',
-                'school:id,nama,latitude,longitude',   // ← fix: pakai 'nama' bukan 'name'
+                'school:id,name,latitude,longitude',
             ])
             ->get();
 
@@ -64,7 +63,7 @@ class CourierLocationService
                 'courier_name' => $schedule->courier->name ?? '',
                 'school'       => [
                     'id'        => $schedule->school->id,
-                    'name'      => $schedule->school->nama      ?? '',    // ← fix
+                    'name'      => $schedule->school->name      ?? '',
                     'latitude'  => $schedule->school->latitude,
                     'longitude' => $schedule->school->longitude,
                 ],

@@ -12,11 +12,13 @@ class DatabaseSeeder extends Seeder
     /**
      * Seed the application's database.
      *
-     * Urutan penting:
-     * 1. Permissions dulu (dependency dari roles)
-     * 2. Roles (sync permissions)
-     * 3. SPPG (dependency dari users/employees)
-     * 4. Users + Employees (butuh SPPG + roles)
+     * Urutan penting berdasarkan dependensi:
+     * 1. Permissions & Roles
+     * 2. SPPG, Users, & Employees (termasuk Kurir)
+     * 3. Schools & SPPGSchool Pivot
+     * 4. Partners & Bahan Baku / Resep / Menu
+     * 5. Jadwal Pengiriman & Riwayat
+     * 6. Feedback, PublicUsers, & Data Dummy Lainnya
      */
     public function run(): void
     {
@@ -25,11 +27,24 @@ class DatabaseSeeder extends Seeder
             RoleSeeder::class,
             SPPGSeeder::class,
             UserSeeder::class,
+            SchoolSeeder::class,       // Sebelummya terlewat
+            SPPGSchoolSeeder::class,   // Pivot SPPG-School
             PartnerSeeder::class,
             IngredientSeeder::class,
             RecipeSeeder::class,
+<<<<<<< Updated upstream
             SchoolSeeder::class,
             DistributionSeeder::class,
+=======
+            MenuSeeder::class,
+            DeliveryScheduleSeeder::class,
+            FeedbackSeeder::class,
+            PublicUserSeeder::class,
+            FinancialReportSeeder::class,
+            RatingSeeder::class,
+            RecommendationSeeder::class,
+            SPPGSubmissionSeeder::class,
+>>>>>>> Stashed changes
         ]);
     }
 }

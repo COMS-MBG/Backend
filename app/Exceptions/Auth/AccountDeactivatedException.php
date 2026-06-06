@@ -10,7 +10,7 @@ class AccountDeactivatedException extends \Exception
     {
         return response()->json([
             'success' => false,
-            'message' => 'Akun Anda telah dinonaktifkan. Hubungi administrator.',
+            'message' => 'Akun tidak aktif',
         ], 403);
     }
 }

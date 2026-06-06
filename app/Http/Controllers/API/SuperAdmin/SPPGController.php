@@ -36,9 +36,9 @@ class SPPGController extends Controller
         ]);
     }
 
-    public function store(StoreSPPGRequest $request): JsonResponse
+    public function store(\App\Http\Requests\SPPG\RegisterSppgRequest $request, \App\Services\SPPG\SppgRegistrationService $registrationService): JsonResponse  //error
     {
-        $sppg = $this->sppgService->create($request->validated());
+        $sppg = $registrationService->register($request->validated());
 
         return response()->json([
             'success' => true,
@@ -71,11 +71,107 @@ class SPPGController extends Controller
 
     public function destroy(string $id): JsonResponse
     {
-        $this->sppgService->delete($id);
+        \Illuminate\Support\Facades\DB::transaction(function() use ($id) {
+            $this->sppgService->delete($id);
+
+            // Deactivate all users of this SPPG
+            \App\Models\User::where('sppg_id', $id)->update(['is_active' => false]);
+
+            // Detach all partners
+            \App\Models\Partner::where('sppg_id', $id)->update(['sppg_id' => null]);
+        });
 
         return response()->json([
             'success' => true,
             'message' => 'SPPG berhasil dihapus.',
+        ]);
+    }
+
+    public function deactivate(string $id): JsonResponse
+    {
+        \Illuminate\Support\Facades\DB::transaction(function() use ($id) {
+            $sppg = \App\Models\SPPG::findOrFail($id);
+            $sppg->status = 'inactive';
+            $sppg->save();
+
+            \App\Models\User::where('sppg_id', $id)->update(['is_active' => false]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'SPPG berhasil dinonaktifkan.',
+        ]);
+    }
+
+    public function activate(string $id): JsonResponse
+    {
+        \Illuminate\Support\Facades\DB::transaction(function() use ($id) {
+            $sppg = \App\Models\SPPG::findOrFail($id);
+            $sppg->status = 'active';
+            $sppg->save();
+
+            \App\Models\User::where('sppg_id', $id)->update(['is_active' => true]);
+        });
+
+        return response()->json([
+            'success' => true,
+            'message' => 'SPPG berhasil diaktifkan kembali.',
+        ]);
+    }
+
+    public function partners(string $id, \App\Services\SuperAdmin\MapService $mapService): JsonResponse
+    {
+        $sppg = \App\Models\SPPG::findOrFail($id);
+        $partners = \App\Models\Partner::where('sppg_id', $sppg->id)->get();
+
+        $data = $partners->map(function ($p) use ($sppg, $mapService) {
+            $dist = $mapService->calculateHaversineDistance($sppg->latitude, $sppg->longitude, $p->latitude, $p->longitude);
+            
+            // Get OSRM duration and distance if available
+            $route = $mapService->getRouteDurationAndDistance($sppg->latitude, $sppg->longitude, $p->latitude, $p->longitude);
+            
+            $status = $dist <= 5.0 ? 'safe' : 'review';
+
+            return [
+                'id'                => $p->id,
+                'school_name'       => $p->school_name,
+                'npsn'              => $p->npsn,
+                'school_type'       => $p->school_type,
+                'ownership_status'  => $p->ownership_status,
+                'address'           => $p->address,
+                'district'          => $p->district,
+                'city'              => $p->city,
+                'latitude'          => $p->latitude,
+                'longitude'         => $p->longitude,
+                'portion_count'     => $p->portion_count,
+                'distance_km'       => $dist,
+                'estimated_minutes' => $route ? $route['duration_minutes'] : null,
+                'distance_status'   => $status,
+            ];
+        });
+
+        return response()->json([
+            'success' => true,
+            'data' => $data,
+        ]);
+    }
+
+    public function menus(string $id): JsonResponse
+    {
+        $menus = \App\Models\Menu::with(['menuItems.recipe'])
+            ->orderByRaw("CASE 
+                WHEN status = 'published' THEN 1 
+                WHEN status = 'scheduled' THEN 2 
+                WHEN status = 'planned' THEN 3 
+                WHEN status = 'archived' THEN 4 
+                ELSE 5 
+             END")
+            ->orderBy('week_start', 'asc')
+            ->get();
+
+        return response()->json([
+            'success' => true,
+            'data' => \App\Http\Resources\MenuResource::collection($menus),
         ]);
     }
 

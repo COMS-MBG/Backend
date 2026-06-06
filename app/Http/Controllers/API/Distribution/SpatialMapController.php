@@ -61,7 +61,7 @@ class SpatialMapController extends Controller
     public function activeCouriers(Request $request): JsonResponse
     {
         abort_unless(
-            $request->user()->hasAnyRole(['admin_logistik', 'admin_sppg', 'super_admin']),
+            $request->user()->hasAnyRole(['logistics_admin', 'sppg_admin', 'super_admin']),
             403
         );
 
@@ -100,7 +100,7 @@ class SpatialMapController extends Controller
     public function optimizeRoute(Request $request): JsonResponse
     {
         abort_unless(
-            $request->user()->hasAnyRole(['admin_logistik', 'admin_sppg', 'super_admin']),
+            $request->user()->hasAnyRole(['logistics_admin', 'sppg_admin', 'super_admin']),
             403
         );
 

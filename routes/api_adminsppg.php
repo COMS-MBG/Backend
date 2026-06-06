@@ -16,6 +16,7 @@ use App\Http\Controllers\API\AdminSPPG\FinancialReportController;
 use App\Http\Controllers\API\AdminSPPG\PartnerController;
 use App\Http\Controllers\API\AdminSPPG\RoleController;
 use App\Http\Controllers\API\AdminSPPG\PermissionController;
+use App\Http\Controllers\API\AdminSPPG\StockController;
 
 Route::middleware(['auth:sanctum'])
     ->prefix('admin-sppg')
@@ -71,56 +72,49 @@ Route::middleware(['auth:sanctum'])
     Route::delete('partners/{partner}', [PartnerController::class, 'destroy'])
         ->middleware('permission:partner.delete');
 
-    // ── Manajemen Gizi ────────────────────────────────────────────────────────
     Route::prefix('nutrition')->group(function () {
-
         // Ingredients
-        Route::get('ingredients/dropdown', [IngredientController::class, 'dropdown'])
-            ->middleware('permission:ingredients.read');
-        Route::post('ingredients/calculate-nutrition', [IngredientController::class, 'calculateNutrition'])
-            ->middleware('permission:ingredients.read');
-        Route::middleware('permission:ingredients.read')->group(function () {
-            Route::get('ingredients', [IngredientController::class, 'index']);
-            Route::get('ingredients/{ingredient}', [IngredientController::class, 'show']);
-        });
-        Route::post('ingredients', [IngredientController::class, 'store'])
-            ->middleware('permission:ingredients.create');
-        Route::match(['put', 'patch'], 'ingredients/{ingredient}', [IngredientController::class, 'update'])
-            ->middleware('permission:ingredients.update');
-        Route::delete('ingredients/{ingredient}', [IngredientController::class, 'destroy'])
-            ->middleware('permission:ingredients.delete');
+        Route::get('ingredients/dropdown', [IngredientController::class, 'dropdown']);
+        Route::post('ingredients/calculate-nutrition', [IngredientController::class, 'calculateNutrition']);
+        Route::get('ingredients', [IngredientController::class, 'index']);
+        Route::get('ingredients/{ingredient}', [IngredientController::class, 'show']);
+        Route::post('ingredients', [IngredientController::class, 'store']);
+        Route::match(['put', 'patch'], 'ingredients/{ingredient}', [IngredientController::class, 'update']);
+        Route::delete('ingredients/{ingredient}', [IngredientController::class, 'destroy']);
 
         // Recipes
-        Route::get('recipes/dropdown', [RecipeController::class, 'dropdown'])
-            ->middleware('permission:recipes.read');
-        Route::middleware('permission:recipes.read')->group(function () {
-            Route::get('recipes', [RecipeController::class, 'index']);
-            Route::get('recipes/{recipe}', [RecipeController::class, 'show']);
-        });
-        Route::post('recipes', [RecipeController::class, 'store'])
-            ->middleware('permission:recipes.create');
-        Route::match(['put', 'patch'], 'recipes/{recipe}', [RecipeController::class, 'update'])
-            ->middleware('permission:recipes.update');
-        Route::delete('recipes/{recipe}', [RecipeController::class, 'destroy'])
-            ->middleware('permission:recipes.delete');
+        Route::get('recipes/dropdown', [RecipeController::class, 'dropdown']);
+        Route::get('recipes', [RecipeController::class, 'index']);
+        Route::get('recipes/{recipe}', [RecipeController::class, 'show']);
+        Route::post('recipes', [RecipeController::class, 'store']);
+        Route::match(['put', 'patch'], 'recipes/{recipe}', [RecipeController::class, 'update']);
+        Route::delete('recipes/{recipe}', [RecipeController::class, 'destroy']);
 
         // Menus
-        Route::post('menus/refresh-statuses', [MenuController::class, 'refreshStatuses'])
-            ->middleware('permission:menus.update');
-        Route::get('menus/{id}/grouped', [MenuController::class, 'showGrouped'])
-            ->middleware('permission:menus.read');
-        Route::patch('menus/{id}/publish', [MenuController::class, 'publish'])
-            ->middleware('permission:menus.update');
-        Route::middleware('permission:menus.read')->group(function () {
-            Route::get('menus', [MenuController::class, 'index']);
-            Route::get('menus/{menu}', [MenuController::class, 'show']);
-        });
-        Route::post('menus', [MenuController::class, 'store'])
-            ->middleware('permission:menus.create');
-        Route::match(['put', 'patch'], 'menus/{menu}', [MenuController::class, 'update'])
-            ->middleware('permission:menus.update');
-        Route::delete('menus/{menu}', [MenuController::class, 'destroy'])
-            ->middleware('permission:menus.delete');
+        Route::post('menus/refresh-statuses', [MenuController::class, 'refreshStatuses']);
+        Route::get('menus/{id}/grouped', [MenuController::class, 'showGrouped']);
+        Route::patch('menus/{id}/publish', [MenuController::class, 'publish']);
+        Route::get('menus', [MenuController::class, 'index']);
+        Route::get('menus/{menu}', [MenuController::class, 'show']);
+        Route::post('menus', [MenuController::class, 'store']);
+        Route::match(['put', 'patch'], 'menus/{menu}', [MenuController::class, 'update']);
+        Route::delete('menus/{menu}', [MenuController::class, 'destroy']);
+    });
+
+    // ── Manajemen Stok ────────────────────────────────────────────────────────
+    Route::prefix('stocks')->group(function () {
+        Route::get('/', [StockController::class, 'index']);
+        Route::get('/pending', [StockController::class, 'pendingApproval']);
+        Route::get('/transactions', [StockController::class, 'allTransactions']);
+        Route::get('/check-menu/{menu_id}', [StockController::class, 'checkMenu']);
+        Route::get('/{ingredient_id}', [StockController::class, 'show']);
+        Route::post('/', [StockController::class, 'store']);
+        Route::put('/minimum/{ingredient_id}', [StockController::class, 'updateMinimum']);
+        Route::put('/{id}', [StockController::class, 'update']);
+        Route::delete('/{id}', [StockController::class, 'destroy']);
+        Route::post('/{id}/approve', [StockController::class, 'approve']);
+        Route::post('/{id}/reject', [StockController::class, 'reject']);
+        Route::get('/{id}/transactions', [StockController::class, 'batchTransactions']);
     });
 
     // ── Distribusi ────────────────────────────────────────────────────────────

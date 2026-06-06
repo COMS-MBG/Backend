@@ -14,17 +14,11 @@ class SchoolController extends Controller
 {
     public function __construct(private readonly SchoolService $schoolService) {}
 
-    private function sppgId(): string
-    {
-        return auth('api')->user()->sppg_id;
-    }
-
     public function index(Request $request): JsonResponse
     {
         $schools = $this->schoolService->getAll(
-            $request->only(['jenjang', 'search']),
-            $request->integer('per_page', 15),
-            $this->sppgId()
+            $request->only(['school_level', 'city', 'search', 'sppg_id', 'without_sppg']),
+            $request->integer('per_page', 15)
         );
 
         return response()->json([
@@ -40,10 +34,7 @@ class SchoolController extends Controller
 
     public function store(StoreSchoolRequest $request): JsonResponse
     {
-        $data           = $request->validated();
-        $data['sppg_id'] = $this->sppgId(); // paksa ke SPPG sendiri
-
-        $school = $this->schoolService->create($data);
+        $school = $this->schoolService->create($request->validated());
 
         return response()->json([
             'success' => true,
@@ -54,7 +45,7 @@ class SchoolController extends Controller
 
     public function show(string $id): JsonResponse
     {
-        $school = $this->schoolService->findById($id, $this->sppgId());
+        $school = $this->schoolService->findById($id);
 
         return response()->json([
             'success' => true,
@@ -64,7 +55,7 @@ class SchoolController extends Controller
 
     public function update(UpdateSchoolRequest $request, string $id): JsonResponse
     {
-        $school = $this->schoolService->update($id, $request->validated(), $this->sppgId());
+        $school = $this->schoolService->update($id, $request->validated());
 
         return response()->json([
             'success' => true,
@@ -75,7 +66,7 @@ class SchoolController extends Controller
 
     public function destroy(string $id): JsonResponse
     {
-        $this->schoolService->delete($id, $this->sppgId());
+        $this->schoolService->delete($id);
 
         return response()->json([
             'success' => true,

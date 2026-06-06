@@ -36,6 +36,18 @@ class LoginAction
             throw new AccountDeactivatedException();
         }
 
+        if ($user->role_type === 'sppg_user') {
+            $sppg = $user->sppg;
+            if ($sppg && $sppg->status === 'inactive') {
+                if ((int) $sppg->pemilik_id === (int) $user->id) {
+                    $sppg->status = 'active';
+                    $sppg->save();
+                } else {
+                    throw new \App\Exceptions\Auth\SppgInactiveException();
+                }
+            }
+        }
+
         // Create authenticated session via web guard
         $remember = $request->boolean('remember');
         Auth::login($user, $remember);

@@ -1,5 +1,4 @@
-﻿<?php
-
+<?php
 namespace App\Services\SPPG;
 
 use App\Models\SPPG;
@@ -8,13 +7,13 @@ class SPPGCapacityService
 {
     public function isOvercapacity(SPPG $sppg): bool
     {
-        return $sppg->schools()->count() >= $sppg->kapasitas;
+        return $sppg->schools()->count() >= $sppg->capacity;
     }
 
     public function getCapacityStatus(SPPG $sppg): array
     {
-        $current = $sppg->schools()->where('status', 'aktif')->count();
-        $max     = $sppg->kapasitas;
+        $current = $sppg->schools()->where('status', 'active')->count();
+        $max     = $sppg->capacity;
 
         return [
             'current'     => $current,
@@ -28,9 +27,9 @@ class SPPGCapacityService
 
     public function getOvercapacitySppgs(): \Illuminate\Database\Eloquent\Collection
     {
-        return SPPG::withCount(['schools' => fn($q) => $q->where('status', 'aktif')])
+        return SPPG::withCount(['schools' => fn($q) => $q->where('status', 'active')])
             ->get()
-            ->filter(fn($s) => $s->schools_count >= $s->kapasitas)
+            ->filter(fn($s) => $s->schools_count >= $s->capacity)
             ->values();
     }
 }

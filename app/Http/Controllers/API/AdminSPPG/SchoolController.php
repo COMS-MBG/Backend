@@ -11,17 +11,25 @@ use Illuminate\Http\Request;
 /**
  * SchoolController – AdminSPPG
  *
- * CRUD sekolah untuk panel admin SPPG.
- * Data sekolah dipakai admin logistik saat membuat jadwal pengiriman.
- *
- * CATATAN: School model memakai kolom bahasa Indonesia:
- *   nama, alamat, jumlah_siswa, jenjang, kecamatan, kota, provinsi,
- *   telepon, kepala_sekolah, latitude, longitude, status
+ * CRUD schools for the Admin SPPG panel.
+ * School data is used by logistics admin when creating delivery schedules.
  *
  * Base URL: /api/admin-sppg/schools
  */
 class SchoolController extends Controller
 {
+    private function getSppgId(Request $request): int
+    {
+        $sppgId = $request->user()->sppg_id ?? $request->user()->employee?->sppg_id;
+        abort_if(!$sppgId, 403, 'Anda tidak terhubung dengan SPPG manapun.');
+        return (int) $sppgId;
+    }
+
+    private function validateOwnership(Request $request, School $school): void
+    {
+        abort_if((int) $school->sppg_id !== $this->getSppgId($request), 403, 'Anda tidak memiliki akses ke sekolah ini.');
+    }
+
     /**
      * [GET] Daftar semua sekolah (paginated + filterable).
      * Endpoint: GET /api/admin-sppg/schools
@@ -34,20 +42,21 @@ class SchoolController extends Controller
      */
     public function index(Request $request): JsonResponse
     {
-        $query = School::query()->latest();
+        $sppgId = $this->getSppgId($request);
+        $query = School::query()->where('sppg_id', $sppgId)->latest();
 
         if ($request->filled('search')) {
             $keyword = $request->search;
             $query->where(function ($q) use ($keyword) {
-                $q->where('nama', 'like', "%{$keyword}%")
-                  ->orWhere('kecamatan', 'like', "%{$keyword}%")
-                  ->orWhere('kota', 'like', "%{$keyword}%")
-                  ->orWhere('alamat', 'like', "%{$keyword}%");
+                $q->where('name',     'like', "%{$keyword}%")
+                  ->orWhere('district', 'like', "%{$keyword}%")
+                  ->orWhere('city',     'like', "%{$keyword}%")
+                  ->orWhere('address',  'like', "%{$keyword}%");
             });
         }
 
-        if ($request->filled('jenjang')) {
-            $query->where('jenjang', $request->jenjang);
+        if ($request->filled('school_level')) {
+            $query->where('school_level', $request->school_level);
         }
 
         if ($request->filled('status')) {
@@ -76,8 +85,10 @@ class SchoolController extends Controller
      * [GET] Detail satu sekolah.
      * Endpoint: GET /api/admin-sppg/schools/{school}
      */
-    public function show(School $school): JsonResponse
+    public function show(Request $request, School $school): JsonResponse
     {
+        $this->validateOwnership($request, $school);
+
         return response()->json([
             'success' => true,
             'data'    => new SchoolResource($school),
@@ -90,30 +101,25 @@ class SchoolController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
+        $sppgId = $this->getSppgId($request);
+
         $validated = $request->validate([
-            'nama'           => ['required', 'string', 'max:255'],
-            'alamat'         => ['nullable', 'string', 'max:1000'],
-            'latitude'       => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude'      => ['nullable', 'numeric', 'between:-180,180'],
-            'jumlah_siswa'   => ['nullable', 'integer', 'min:0'],
-            'jenjang'        => ['nullable', 'string', 'in:SD,SMP,SMA,SMK'],
-            'kecamatan'      => ['nullable', 'string', 'max:100'],
-            'kota'           => ['nullable', 'string', 'max:100'],
-            'provinsi'       => ['nullable', 'string', 'max:100'],
-            'telepon'        => ['nullable', 'string', 'max:20'],
-            'kepala_sekolah' => ['nullable', 'string', 'max:255'],
-            'sppg_id'        => ['nullable', 'integer', 'exists:s_p_p_g_s,id'],
-            'status'         => ['nullable', 'string', 'in:active,inactive'],
+            'name'          => ['required', 'string', 'max:255'],
+            'address'       => ['nullable', 'string', 'max:1000'],
+            'latitude'      => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude'     => ['nullable', 'numeric', 'between:-180,180'],
+            'student_count' => ['nullable', 'integer', 'min:0'],
+            'school_level'  => ['nullable', 'string', 'in:SD,SMP,SMA,SMK'],
+            'district'      => ['nullable', 'string', 'max:100'],
+            'city'          => ['nullable', 'string', 'max:100'],
+            'province'      => ['nullable', 'string', 'max:100'],
+            'phone'         => ['nullable', 'string', 'max:20'],
+            'principal'     => ['nullable', 'string', 'max:255'],
+            'status'        => ['nullable', 'string', 'in:active,inactive'],
         ]);
 
-        $validated['status'] = $validated['status'] ?? 'active';
-
-        // Gunakan sppg_id dari user yang login jika tidak disediakan
-        if (!isset($validated['sppg_id'])) {
-            $validated['sppg_id'] = $request->user()->sppg_id
-                ?? $request->user()->employee?->sppg_id
-                ?? null;
-        }
+        $validated['status']  = $validated['status'] ?? 'active';
+        $validated['sppg_id'] = $sppgId;
 
         $school = School::create($validated);
 
@@ -130,19 +136,21 @@ class SchoolController extends Controller
      */
     public function update(Request $request, School $school): JsonResponse
     {
+        $this->validateOwnership($request, $school);
+
         $validated = $request->validate([
-            'nama'           => ['sometimes', 'string', 'max:255'],
-            'alamat'         => ['nullable', 'string', 'max:1000'],
-            'latitude'       => ['nullable', 'numeric', 'between:-90,90'],
-            'longitude'      => ['nullable', 'numeric', 'between:-180,180'],
-            'jumlah_siswa'   => ['nullable', 'integer', 'min:0'],
-            'jenjang'        => ['nullable', 'string', 'in:SD,SMP,SMA,SMK'],
-            'kecamatan'      => ['nullable', 'string', 'max:100'],
-            'kota'           => ['nullable', 'string', 'max:100'],
-            'provinsi'       => ['nullable', 'string', 'max:100'],
-            'telepon'        => ['nullable', 'string', 'max:20'],
-            'kepala_sekolah' => ['nullable', 'string', 'max:255'],
-            'status'         => ['nullable', 'string', 'in:active,inactive'],
+            'name'          => ['sometimes', 'string', 'max:255'],
+            'address'       => ['nullable', 'string', 'max:1000'],
+            'latitude'      => ['nullable', 'numeric', 'between:-90,90'],
+            'longitude'     => ['nullable', 'numeric', 'between:-180,180'],
+            'student_count' => ['nullable', 'integer', 'min:0'],
+            'school_level'  => ['nullable', 'string', 'in:SD,SMP,SMA,SMK'],
+            'district'      => ['nullable', 'string', 'max:100'],
+            'city'          => ['nullable', 'string', 'max:100'],
+            'province'      => ['nullable', 'string', 'max:100'],
+            'phone'         => ['nullable', 'string', 'max:20'],
+            'principal'     => ['nullable', 'string', 'max:255'],
+            'status'        => ['nullable', 'string', 'in:active,inactive'],
         ]);
 
         $school->update($validated);
@@ -158,8 +166,10 @@ class SchoolController extends Controller
      * [DELETE] Hapus sekolah (soft delete).
      * Endpoint: DELETE /api/admin-sppg/schools/{school}
      */
-    public function destroy(School $school): JsonResponse
+    public function destroy(Request $request, School $school): JsonResponse
     {
+        $this->validateOwnership($request, $school);
+
         // Cek apakah sekolah masih punya jadwal aktif
         $activeSchedules = \App\Models\DeliverySchedule::where('school_id', $school->id)
             ->whereNotIn('status', ['confirmed', 'rejected'])

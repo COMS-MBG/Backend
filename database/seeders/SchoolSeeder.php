@@ -12,6 +12,7 @@ class SchoolSeeder extends Seeder
     {
         $sppgUtara   = SPPG::where('name', 'SPPG Bandung Utara')->first();
         $sppgSelatan = SPPG::where('name', 'SPPG Bandung Selatan')->first();
+<<<<<<< Updated upstream
         $sppgTimur   = SPPG::where('name', 'SPPG Bandung Timur')->first();
 
         $schools = [
@@ -42,15 +43,29 @@ class SchoolSeeder extends Seeder
             ['nama' => 'SMP Negeri 2 Bandung',    'alamat' => 'Jl. Sumatera No.42',          'latitude' => -6.9080, 'longitude' => 107.6150, 'jumlah_siswa' => 700,  'jenjang' => 'SMP', 'kota' => 'Bandung', 'sppg_id' => null],
             ['nama' => 'SD Negeri 056 Garuda',    'alamat' => 'Jl. Pajajaran No.84',         'latitude' => -6.9055, 'longitude' => 107.5790, 'jumlah_siswa' => 380,  'jenjang' => 'SD',  'kota' => 'Bandung', 'sppg_id' => null],
             ['nama' => 'SD Negeri 001 Merdeka',   'alamat' => 'Jl. Merdeka No.9',            'latitude' => -6.9135, 'longitude' => 107.6105, 'jumlah_siswa' => 620,  'jenjang' => 'SD',  'kota' => 'Bandung', 'sppg_id' => null],
+=======
+
+        $schools = [
+            // Partners of SPPG Utara
+            ['name' => 'SMA Negeri 1 Bandung',  'address' => 'Jl. Ir. H. Juanda No.93',  'latitude' => -6.8862, 'longitude' => 107.6147, 'student_count' => 1200, 'school_level' => 'SMA', 'city' => 'Bandung', 'sppg_id' => $sppgUtara?->id],
+            ['name' => 'SMA Negeri 2 Bandung',  'address' => 'Jl. Cihampelas No.173',     'latitude' => -6.8920, 'longitude' => 107.6050, 'student_count' => 980,  'school_level' => 'SMA', 'city' => 'Bandung', 'sppg_id' => $sppgUtara?->id],
+            ['name' => 'SMP Negeri 5 Bandung',  'address' => 'Jl. Sumatera No.40',        'latitude' => -6.9050, 'longitude' => 107.6120, 'student_count' => 750,  'school_level' => 'SMP', 'city' => 'Bandung', 'sppg_id' => $sppgUtara?->id],
+            // Partners of SPPG Selatan
+            ['name' => 'SMA Negeri 15 Bandung', 'address' => 'Jl. Sumbawa No.9',          'latitude' => -6.9420, 'longitude' => 107.6130, 'student_count' => 870,  'school_level' => 'SMA', 'city' => 'Bandung', 'sppg_id' => $sppgSelatan?->id],
+            ['name' => 'SMK Negeri 4 Bandung',  'address' => 'Jl. Kliningan No.6',        'latitude' => -6.9580, 'longitude' => 107.6230, 'student_count' => 1100, 'school_level' => 'SMK', 'city' => 'Bandung', 'sppg_id' => $sppgSelatan?->id],
+            // No SPPG assigned yet
+            ['name' => 'SMA Negeri 20 Bandung', 'address' => 'Jl. Citarum No.23',         'latitude' => -6.9200, 'longitude' => 107.6350, 'student_count' => 650,  'school_level' => 'SMA', 'city' => 'Bandung', 'sppg_id' => null],
+            ['name' => 'SMP Negeri 40 Bandung', 'address' => 'Jl. Wastukancana No.2',     'latitude' => -6.9100, 'longitude' => 107.6180, 'student_count' => 520,  'school_level' => 'SMP', 'city' => 'Bandung', 'sppg_id' => null],
+>>>>>>> Stashed changes
         ];
 
         foreach ($schools as $data) {
-            School::firstOrCreate(['nama' => $data['nama']], array_merge($data, [
-                'provinsi' => 'Jawa Barat',
-                'status'   => 'aktif',
+            School::firstOrCreate(['name' => $data['name']], array_merge($data, [
+                'province' => 'West Java',
+                'status'   => 'active',
             ]));
         }
 
-        $this->command->info('School seed selesai: ' . count($schools) . ' sekolah.');
+        $this->command->info('School seed done: ' . count($schools) . ' schools.');
     }
 }

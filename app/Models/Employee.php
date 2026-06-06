@@ -17,12 +17,12 @@ class Employee extends Model
      * Ini label struktural, BUKAN role RBAC.
      */
     const POSITIONS = [
-        'pemilik',
-        'manajer',
-        'ahli_gizi',
-        'admin_logistik',
-        'kurir',
-        'karyawan_operasional',
+        'owner',
+        'manager',
+        'nutritionist',
+        'logistics_admin',
+        'courier',
+        'operational_staff',
     ];
 
     protected $fillable = [
@@ -67,7 +67,7 @@ class Employee extends Model
     {
         return $this->belongsTo(Role::class, 'role_id')
             ->withDefault([
-                'name' => 'Tanpa Akses',
+                'name' => 'No Access',
                 'slug' => null,
             ]);
     }

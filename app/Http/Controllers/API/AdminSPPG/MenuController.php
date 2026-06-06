@@ -196,4 +196,49 @@ class MenuController extends Controller implements HasMiddleware
             'message' => "{$updated} menu berhasil diperbarui statusnya.",
         ]);
     }
+
+    // =============================================
+    // PATCH /api/menus/{id}/publish
+    // Publikasikan menu mingguan dengan validasi stok hard block
+    // =============================================
+    public function publish(Request $request, int $id, \App\Services\Stock\StockService $stockService): JsonResponse
+    {
+        $sppgId = $request->user()->sppg_id;
+        $userId = $request->user()->id;
+
+        try {
+            $menu = \App\Models\Menu::findOrFail($id);
+
+            if (in_array($menu->status, ['published', 'archived'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Menu ini sudah dipublikasikan atau diarsipkan.',
+                ], 422);
+            }
+
+            // Deduct stock (runs validation and FIFO deduction in transaction)
+            $stockService->deductStockForMenu($sppgId, $id, $userId);
+
+            // Update status
+            $menu->update(['status' => 'published']);
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Perencanaan menu berhasil dipublikasikan.',
+                'data'    => new MenuResource($menu),
+            ]);
+        } catch (\App\Exceptions\StockShortageException $e) {
+            throw $e;
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Perencanaan menu tidak ditemukan.',
+            ], 404);
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Gagal mempublikasikan menu: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
 }

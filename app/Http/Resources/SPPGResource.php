@@ -30,6 +30,9 @@ class SPPGResource extends JsonResource
                 'id'   => $this->owner?->id,
                 'name' => $this->owner?->name,
             ]),
+            'total_mitra'            => (int) ($this->partners_count ?? $this->partners()->count()),
+            'total_porsi'            => (int) ($this->total_porsi ?? $this->partners()->sum('portion_count')),
+            'total_penerima_manfaat' => (int) ($this->total_porsi ?? $this->partners()->sum('portion_count')),
             'schools_count'    => $this->whenCounted('schools'),
             'schools'          => SchoolResource::collection($this->whenLoaded('schools')),
             'capacity_status'  => $this->when(

@@ -14,7 +14,11 @@ return new class extends Migration
             $table->string('slug')->unique();
             $table->string('module')->nullable();
             $table->string('feature')->nullable();
-            $table->enum('action', ['create', 'read', 'update', 'delete'])->nullable();
+            if (Illuminate\Support\Facades\DB::getDriverName() === 'sqlite') {
+                $table->string('action')->nullable();
+            } else {
+                $table->enum('action', ['create', 'read', 'update', 'delete'])->nullable();
+            }
             $table->timestamps();
         });
     }

@@ -20,7 +20,11 @@ return new class extends Migration
             $table->string('vehicle_plate', 20)->nullable();
             $table->timestamp('departed_at')->nullable();
             $table->timestamp('arrived_at')->nullable();
-            $table->integer('duration_minutes')->storedAs('EXTRACT(EPOCH FROM (arrived_at - departed_at)) / 60');
+            if (Illuminate\Support\Facades\DB::getDriverName() === 'sqlite') {
+                $table->integer('duration_minutes')->nullable();
+            } else {
+                $table->integer('duration_minutes')->storedAs('EXTRACT(EPOCH FROM (arrived_at - departed_at)) / 60');
+            }
             $table->string('proof_photo_path')->nullable();
             $table->json('route_snapshot')->nullable()->comment('GeoJSON of the route taken');
             $table->decimal('distance_km', 8, 3)->nullable();

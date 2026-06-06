@@ -34,7 +34,9 @@ class ScopeBySppg
         }
 
         // Ambil sppg_id dari route parameter
-        $sppgId = $request->route('sppg') ?? $request->route('sppg_id');
+        $sppgId = $request->route('sppg') 
+            ?? $request->route('sppg_id') 
+            ?? $request->route('sppgId');
 
         if ($sppgId && !$user->ownsSppg((int) $sppgId)) {
             return response()->json([

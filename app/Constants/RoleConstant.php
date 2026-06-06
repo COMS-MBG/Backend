@@ -11,5 +11,5 @@ namespace App\Constants;
 class RoleConstant
 {
     /** Roles with access to SPPG management features (employees, schools, partners, roles). */
-    public const SPPG_MANAGEMENT_ROLES = 'pemilik|manajer|admin-sppg';
+    public const SPPG_MANAGEMENT_ROLES = 'owner|manager|sppg_admin';
 }

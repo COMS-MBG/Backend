@@ -57,7 +57,7 @@ class CourierTrackingController extends Controller
 
         $schedule = DeliverySchedule::findOrFail($validated['schedule_id']);
 
-        // Pastikan kurir yang mengirim adalah kurir yang bertugas
+        // Ensure the courier sending the update is the assigned courier
         $courierId = $request->user()->employee?->id;
         abort_unless(
             $schedule->courier_id === $courierId || $request->user()->hasAnyRole(['super_admin']),
@@ -81,7 +81,7 @@ class CourierTrackingController extends Controller
     public function activeCouriers(Request $request): JsonResponse
     {
         abort_unless(
-            $request->user()->hasAnyRole(['admin_logistik', 'admin_sppg', 'super_admin']),
+            $request->user()->hasAnyRole(['logistics_admin', 'sppg_admin', 'super_admin']),
             403
         );
 
@@ -101,7 +101,7 @@ class CourierTrackingController extends Controller
     public function trail(Request $request, int $scheduleId): JsonResponse
     {
         abort_unless(
-            $request->user()->hasAnyRole(['admin_logistik', 'admin_sppg', 'super_admin', 'courier']),
+            $request->user()->hasAnyRole(['logistics_admin', 'sppg_admin', 'super_admin', 'courier']),
             403
         );
 

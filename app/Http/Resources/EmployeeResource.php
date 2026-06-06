@@ -31,9 +31,9 @@ class EmployeeResource extends JsonResource
                 'name' => $this->role?->name,
                 'slug' => $this->role?->slug,
             ]),
-            // Gaji hanya terlihat oleh pemilik/manajer/super_admin
+            // Salary only visible to owner/manager/super_admin
             'base_salary' => $this->when(
-                $request->user()?->hasAnyRole(['super_admin', 'pemilik', 'manajer']),
+                $request->user()?->hasAnyRole(['super_admin', 'owner', 'manager']),
                 $this->base_salary
             ),
             'created_at'  => $this->created_at?->toISOString(),

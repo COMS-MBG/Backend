@@ -157,7 +157,7 @@ class MenuService
      */
     public function refreshAllStatuses(): int
     {
-        $menus   = Menu::whereNull('deleted_at')->get();
+        $menus   = Menu::whereNull('deleted_at')->whereNotIn('status', ['published', 'archived'])->get();
         $updated = 0;
 
         foreach ($menus as $menu) {
@@ -192,8 +192,8 @@ class MenuService
                 $grouped[$day]['date']    = $item->menu_date->format('Y-m-d');
                 $grouped[$day]['items'][] = [
                     'id'              => $item->id,
-                    'meal_time'       => $item->meal_time,
-                    'meal_time_label' => $item->meal_time_label,
+                    //'meal_time'       => $item->meal_time,
+                    //'meal_time_label' => $item->meal_time_label,
                     'order'           => $item->order,
                     'recipe'          => $item->recipe ? [
                         'id'            => $item->recipe->id,
@@ -223,7 +223,7 @@ class MenuService
                 'recipe_id'   => $item['recipe_id'],
                 'day_of_week' => $item['day_of_week'],
                 'menu_date'   => $item['menu_date'],
-                'meal_time' => null,
+                //'meal_time' => null,
                 'order'       => $item['order'] ?? 0,
             ]);
         }
@@ -231,6 +231,9 @@ class MenuService
 
     private function refreshStatus(Menu $menu): void
     {
+        if (in_array($menu->status, ['published', 'archived'])) {
+            return;
+        }
         $newStatus = Menu::computeStatus($menu->week_start);
         if ($menu->status !== $newStatus) {
             $menu->update(['status' => $newStatus]);

@@ -3,47 +3,34 @@
 namespace App\Http\Controllers\API\SuperAdmin;
 
 use App\Http\Controllers\Controller;
+use App\Models\SPPG;
+use App\Models\Partner;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class DashboardController extends Controller
 {
     /**
-     * Display a listing of the resource.
+     * GET /api/super-admin/dashboard
+     * Returns general statistics about SPPGs and partners.
      */
-    public function index()
+    public function index(Request $request): JsonResponse
     {
-        //
-    }
+        $totalSppg = SPPG::where('status', '!=', 'deleted')->count();
+        $totalSppgActive = SPPG::where('status', 'active')->count();
+        $totalSppgInactive = SPPG::where('status', 'inactive')->count();
+        $totalPartners = Partner::whereNotNull('sppg_id')->count();
+        $totalDailyPortions = (int) Partner::whereNotNull('sppg_id')->sum('portion_count');
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //
-    }
-
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
-    {
-        //
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //
-    }
-
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
-    {
-        //
+        return response()->json([
+            'success' => true,
+            'data' => [
+                'total_sppg' => $totalSppg,
+                'total_sppg_active' => $totalSppgActive,
+                'total_sppg_inactive' => $totalSppgInactive,
+                'total_partners' => $totalPartners,
+                'total_daily_portions' => $totalDailyPortions,
+            ],
+        ]);
     }
 }

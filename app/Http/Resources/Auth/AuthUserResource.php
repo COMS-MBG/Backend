@@ -28,6 +28,7 @@ class AuthUserResource extends JsonResource
                 'name'   => $this->sppg->name,
                 'status' => $this->sppg->status,
             ] : null,
+            'sppg_status'     => $this->sppg?->status,
             'permissions'     => $this->resolvePermissions(),
         ];
     }

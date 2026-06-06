@@ -48,8 +48,8 @@ class CourierTaskSubmitted implements ShouldBroadcastNow
     {
         return [
             'schedule_id'    => $this->schedule->id,
-            'school_name'    => $this->schedule->school?->nama    ?? '',   // fix: pakai 'nama'
-            'school_address' => $this->schedule->school?->alamat  ?? '',   // fix: pakai 'alamat'
+            'school_name'    => $this->schedule->school?->name    ?? '',
+            'school_address' => $this->schedule->school?->address  ?? '',
             'vehicle_type'   => $this->schedule->vehicle_type,
             'vehicle_plate'  => $this->schedule->vehicle_plate,
             'scheduled_at'   => $this->schedule->scheduled_at?->toIso8601String(),

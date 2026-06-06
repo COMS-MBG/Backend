@@ -10,32 +10,32 @@ class SchoolResource extends JsonResource
     public function toArray(Request $request): array
     {
         return [
-            'id'              => $this->id,
-            'nama'            => $this->nama,
-            'alamat'          => $this->alamat,
-            'koordinat'       => [
+            'id'            => $this->id,
+            'name'          => $this->name,
+            'address'       => $this->address,
+            'coordinates'   => [
                 'lat' => (float) $this->latitude,
                 'lng' => (float) $this->longitude,
             ],
-            'jumlah_siswa'    => $this->jumlah_siswa,
-            'jenjang'         => $this->jenjang,
-            'kecamatan'       => $this->kecamatan,
-            'kota'            => $this->kota,
-            'provinsi'        => $this->provinsi,
-            'telepon'         => $this->telepon,
-            'kepala_sekolah'  => $this->kepala_sekolah,
-            'status'          => $this->status,
-            'sppg_id'         => $this->sppg_id,
-            'sppg'            => $this->whenLoaded('sppg', fn() => [
+            'student_count' => $this->student_count,
+            'school_level'  => $this->school_level,
+            'district'      => $this->district,
+            'city'          => $this->city,
+            'province'      => $this->province,
+            'phone'         => $this->phone,
+            'principal'     => $this->principal,
+            'status'        => $this->status,
+            'sppg_id'       => $this->sppg_id,
+            'sppg'          => $this->whenLoaded('sppg', fn() => [
                 'id'   => $this->sppg?->id,
-                'nama' => $this->sppg?->name,
+                'name' => $this->sppg?->name,
             ]),
-            'jarak_ke_sppg_km' => $this->when(
+            'distance_to_sppg_km' => $this->when(
                 $this->relationLoaded('sppg') && $this->sppg,
                 fn() => $this->distanceToSppg()
             ),
-            'created_at'  => $this->created_at?->toISOString(),
-            'updated_at'  => $this->updated_at?->toISOString(),
+            'created_at' => $this->created_at?->toISOString(),
+            'updated_at' => $this->updated_at?->toISOString(),
         ];
     }
 }

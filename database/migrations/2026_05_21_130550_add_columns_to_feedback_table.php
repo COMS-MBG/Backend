@@ -36,6 +36,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('feedback', function (Blueprint $table) {
+<<<<<<< Updated upstream
             $drop = [];
             if (Schema::hasColumn('feedback', 'name')) $drop[] = 'name';
             if (Schema::hasColumn('feedback', 'role')) $drop[] = 'role';
@@ -44,6 +45,16 @@ return new class extends Migration
             if (Schema::hasColumn('feedback', 'is_approved')) $drop[] = 'is_approved';
             if (!empty($drop)) {
                 $table->dropColumn($drop);
+=======
+            $colsToDrop = [];
+            foreach (['name', 'role', 'message', 'rating', 'is_approved'] as $col) {
+                if (Schema::hasColumn('feedback', $col)) {
+                    $colsToDrop[] = $col;
+                }
+            }
+            if (!empty($colsToDrop)) {
+                $table->dropColumn($colsToDrop);
+>>>>>>> Stashed changes
             }
         });
     }

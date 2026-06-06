@@ -13,25 +13,25 @@ class School extends Model
     protected $table = 'schools';
 
     protected $fillable = [
-        'nama',
-        'alamat',
+        'name',
+        'address',
         'latitude',
         'longitude',
-        'jumlah_siswa',
-        'jenjang',        // SD, SMP, SMA, SMK
-        'kecamatan',
-        'kota',
-        'provinsi',
-        'telepon',
-        'kepala_sekolah',
+        'student_count',
+        'school_level',     // SD, SMP, SMA, SMK
+        'district',
+        'city',
+        'province',
+        'phone',
+        'principal',
         'sppg_id',
         'status',
     ];
 
     protected $casts = [
-        'latitude'     => 'float',
-        'longitude'    => 'float',
-        'jumlah_siswa' => 'integer',
+        'latitude'      => 'float',
+        'longitude'     => 'float',
+        'student_count' => 'integer',
     ];
 
     // ─── Relasi ────────────────────────────────────────────────────────────────
@@ -41,10 +41,10 @@ class School extends Model
         return $this->belongsTo(SPPG::class, 'sppg_id');
     }
 
-    // public function distributions()
-    // {
-    //     return $this->hasMany(Distribution::class, 'school_id');
-    // }
+    public function distributions()
+    {
+        return $this->hasMany(DeliverySchedule::class, 'school_id');
+    }
 
     // ─── Scopes ────────────────────────────────────────────────────────────────
 
@@ -70,7 +70,7 @@ class School extends Model
         return !is_null($this->sppg_id);
     }
 
-    // Hitung jarak ke SPPG yang melayani (km)
+    // Calculate distance to serving SPPG (km)
     public function distanceToSppg(): ?float
     {
         if (!$this->sppg) {

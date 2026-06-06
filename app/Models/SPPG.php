@@ -45,6 +45,11 @@ class SPPG extends Model
         return $this->hasMany(School::class, 'sppg_id');
     }
 
+    public function partners()
+    {
+        return $this->hasMany(Partner::class, 'sppg_id');
+    }
+
     public function employees()
     {
         return $this->hasMany(Employee::class, 'sppg_id');

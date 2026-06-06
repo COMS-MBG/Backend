@@ -8,25 +8,24 @@ class UpdateSchoolRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasPermission('school.edit') ?? false;
+        return $this->user()?->hasPermission('school.update') ?? false;
     }
 
     public function rules(): array
     {
         return [
-            'nama'           => 'sometimes|string|max:255',
-            'alamat'         => 'sometimes|string',
-            'latitude'       => 'sometimes|numeric|between:-90,90',
-            'longitude'      => 'sometimes|numeric|between:-180,180',
-            'jumlah_siswa'   => 'sometimes|integer|min:0',
-            'jenjang'        => 'sometimes|in:SD,SMP,SMA,SMK,MI,MTs,MA',
-            'kecamatan'      => 'nullable|string|max:100',
-            'kota'           => 'nullable|string|max:100',
-            'provinsi'       => 'nullable|string|max:100',
-            'telepon'        => 'nullable|string|max:20',
-            'kepala_sekolah' => 'nullable|string|max:255',
-            'sppg_id'        => 'nullable|uuid|exists:sppgs,id',
-            'status'         => 'sometimes|in:aktif,nonaktif',
+            'name'          => 'sometimes|string|max:255',
+            'address'       => 'sometimes|string',
+            'latitude'      => 'nullable|numeric|between:-90,90',
+            'longitude'     => 'nullable|numeric|between:-180,180',
+            'student_count' => 'sometimes|integer|min:0',
+            'school_level'  => 'sometimes|in:SD,SMP,SMA,SMK,MI,MTs,MA',
+            'district'      => 'nullable|string|max:100',
+            'city'          => 'nullable|string|max:100',
+            'province'      => 'nullable|string|max:100',
+            'phone'         => 'nullable|string|max:20',
+            'principal'     => 'nullable|string|max:255',
+            'status'        => 'sometimes|in:active,inactive',
         ];
     }
 }

@@ -10,7 +10,7 @@ class InvalidCredentialsException extends \Exception
     {
         return response()->json([
             'success' => false,
-            'message' => 'Email atau password salah.',
+            'message' => 'Akun tidak ditemukan',
         ], 401);
     }
 }

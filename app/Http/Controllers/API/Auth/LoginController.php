@@ -29,10 +29,21 @@ class LoginController extends Controller
 
         $request->clearRateLimit();
 
-        return response()->json([
+        $token = $user->createToken('auth_token')->plainTextToken;
+
+        $responseData = [
             'success' => true,
             'message' => 'Login berhasil',
+            'token'   => $token,
             'user'    => new AuthUserResource($user),
-        ]);
+        ];
+
+        if ($user->role_type === 'sppg_user') {
+            $user->loadMissing(['employee.role.permissions', 'sppg']);
+            $responseData['sppg_status'] = $user->sppg?->status;
+            $responseData['permissions'] = $user->employee?->role?->permissions?->pluck('slug')->toArray() ?? [];
+        }
+
+        return response()->json($responseData);
     }
 }

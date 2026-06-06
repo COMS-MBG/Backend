@@ -14,19 +14,19 @@ class StoreSchoolRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'nama'           => 'required|string|max:255',
-            'alamat'         => 'required|string',
-            'latitude'       => 'required|numeric|between:-90,90',
-            'longitude'      => 'required|numeric|between:-180,180',
-            'jumlah_siswa'   => 'required|integer|min:0',
-            'jenjang'        => 'required|in:SD,SMP,SMA,SMK,MI,MTs,MA',
-            'kecamatan'      => 'nullable|string|max:100',
-            'kota'           => 'nullable|string|max:100',
-            'provinsi'       => 'nullable|string|max:100',
-            'telepon'        => 'nullable|string|max:20',
-            'kepala_sekolah' => 'nullable|string|max:255',
-            'sppg_id'        => 'nullable|uuid|exists:sppgs,id',
-            'status'         => 'sometimes|in:aktif,nonaktif',
+            'name'          => 'required|string|max:255',
+            'address'       => 'required|string',
+            'latitude'      => 'required|numeric|between:-90,90',
+            'longitude'     => 'required|numeric|between:-180,180',
+            'student_count' => 'required|integer|min:0',
+            'school_level'  => 'required|in:SD,SMP,SMA,SMK,MI,MTs,MA',
+            'district'      => 'nullable|string|max:100',
+            'city'          => 'nullable|string|max:100',
+            'province'      => 'nullable|string|max:100',
+            'phone'         => 'nullable|string|max:20',
+            'principal'     => 'nullable|string|max:255',
+            'sppg_id'       => 'nullable|uuid|exists:sppgs,id',
+            'status'        => 'sometimes|in:active,inactive',
         ];
     }
 }

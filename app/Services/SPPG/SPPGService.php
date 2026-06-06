@@ -11,17 +11,23 @@ class SPPGService
 {
     public function getAll(array $filters = [], int $perPage = 15): LengthAwarePaginator
     {
-        $query = SPPG::with(['owner', 'schools'])
-            ->withCount('schools');
+        $query = SPPG::with(['owner'])
+            ->withCount('partners')
+            ->withSum('partners as total_porsi', 'portion_count');
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
         }
-        if (!empty($filters['city'])) {
-            $query->where('city', 'ilike', "%{$filters['city']}%");
+        $city = $filters['city'] ?? $filters['kota'] ?? null;
+        if (!empty($city)) {
+            $query->where(DB::raw('lower(city)'), 'like', '%' . strtolower($city) . '%');
+        }
+        $district = $filters['district'] ?? $filters['kecamatan'] ?? null;
+        if (!empty($district)) {
+            $query->where(DB::raw('lower(district)'), 'like', '%' . strtolower($district) . '%');
         }
         if (!empty($filters['search'])) {
-            $query->where('name', 'ilike', "%{$filters['search']}%");
+            $query->where(DB::raw('lower(name)'), 'like', '%' . strtolower($filters['search']) . '%');
         }
 
         return $query->orderBy('name')->paginate($perPage);

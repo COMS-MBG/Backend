@@ -26,11 +26,10 @@ class DeliveryScheduleResource extends JsonResource
             ]),
 
             // School / destination
-            // BUG FIX: School pakai kolom 'nama' dan 'alamat' (bukan 'name'/'address')
             'school' => $this->whenLoaded('school', fn() => [
                 'id'        => $this->school->id,
-                'name'      => $this->school->nama      ?? null,   // ← fix
-                'address'   => $this->school->alamat    ?? null,   // ← fix
+                'name'      => $this->school->name     ?? null,
+                'address'   => $this->school->address  ?? null,
                 'latitude'  => $this->school->latitude  ?? null,
                 'longitude' => $this->school->longitude ?? null,
             ]),

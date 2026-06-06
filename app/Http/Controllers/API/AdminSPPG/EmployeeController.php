@@ -11,11 +11,24 @@ use Illuminate\Http\Request;
 
 class EmployeeController extends Controller
 {
-    // ── PINTU TARIK ───────────────────────────────────────────────────────────
+    private function getSppgId(Request $request): int
+    {
+        $sppgId = $request->user()->sppg_id ?? $request->user()->employee?->sppg_id;
+        abort_if(!$sppgId, 403, 'Anda tidak terhubung dengan SPPG manapun.');
+        return (int) $sppgId;
+    }
 
+    private function validateOwnership(Request $request, Employee $employee): void
+    {
+        abort_if((int) $employee->sppg_id !== $this->getSppgId($request), 403, 'Anda tidak memiliki akses ke karyawan ini.');
+    }
+
+    // ── PINTU TARIK ───────────────────────────────────────────────────────────
+    
     public function index(Request $request)
     {
-        $query = Employee::with('role')->latest();
+        $sppgId = $this->getSppgId($request);
+        $query = Employee::with('role')->where('sppg_id', $sppgId)->latest();
 
         if ($request->filled('search')) {
             $query->where('name', 'like', '%' . $request->search . '%');
@@ -32,8 +45,10 @@ class EmployeeController extends Controller
         return response()->json($query->paginate(10));
     }
 
-    public function show(Employee $employee)
+    public function show(Request $request, Employee $employee)
     {
+        $this->validateOwnership($request, $employee);
+
         return response()->json(
             $employee->load('role.permissions', 'user', 'sppg')
         );
@@ -44,9 +59,7 @@ class EmployeeController extends Controller
     public function store(StoreEmployeeRequest $request)
     {
         $data = $request->validated();
-        $data['sppg_id'] = $request->user()->sppg_id
-            ?? $request->user()->employee?->sppg_id
-            ?? 1;
+        $data['sppg_id'] = $this->getSppgId($request);
         $employee = Employee::create($data);
 
         return response()->json([
@@ -57,6 +70,7 @@ class EmployeeController extends Controller
 
     public function update(UpdateEmployeeRequest $request, Employee $employee)
     {
+        $this->validateOwnership($request, $employee);
         $employee->update($request->validated());
 
         return response()->json([
@@ -65,8 +79,9 @@ class EmployeeController extends Controller
         ]);
     }
 
-    public function destroy(Employee $employee)
+    public function destroy(Request $request, Employee $employee)
     {
+        $this->validateOwnership($request, $employee);
         $employee->deleteOrFail();
 
         return response()->json([
@@ -76,18 +91,27 @@ class EmployeeController extends Controller
 
     // ── ASSIGN ROLE ───────────────────────────────────────────────────────────
 
-    public function showAssignRole(Employee $employee)
+    public function showAssignRole(Request $request, Employee $employee)
     {
+        $this->validateOwnership($request, $employee);
+        $sppgId = $this->getSppgId($request);
+
         return response()->json([
             'employee' => $employee->load('role'),
-            'roles'    => Role::orderBy('name', 'asc')->get(),
+            'roles'    => Role::where('sppg_id', $sppgId)->orderBy('name', 'asc')->get(),
         ]);
     }
 
     public function assignRole(Request $request, Employee $employee)
     {
+        $this->validateOwnership($request, $employee);
+        $sppgId = $this->getSppgId($request);
+
         $request->validate([
-            'role_id' => ['required', 'exists:roles,id'],
+            'role_id' => [
+                'required', 
+                \Illuminate\Validation\Rule::exists('roles', 'id')->where('sppg_id', $sppgId)
+            ],
         ]);
 
         $employee->update(['role_id' => $request->role_id]);

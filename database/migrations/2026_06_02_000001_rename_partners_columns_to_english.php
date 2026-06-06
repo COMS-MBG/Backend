@@ -22,6 +22,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+<<<<<<< Updated upstream
         if (Schema::hasColumn('partners', 'nama_sekolah')) {
             Schema::table('partners', function (Blueprint $table) {
                 // Drop old indexes before renaming columns
@@ -37,6 +38,15 @@ return new class extends Migration
                 try {
                     $table->dropIndex(['kabupaten_kota']);
                 } catch (\Exception $e) {}
+=======
+        if (Schema::hasColumn('partners', 'bentuk')) {
+            Schema::table('partners', function (Blueprint $table) {
+                // Drop old indexes before renaming columns
+                $table->dropIndex(['bentuk']);
+                $table->dropIndex(['status']);
+                $table->dropIndex(['kecamatan']);
+                $table->dropIndex(['kabupaten_kota']);
+>>>>>>> Stashed changes
 
                 // Rename columns
                 $table->renameColumn('nama_sekolah',   'school_name');
@@ -60,6 +70,7 @@ return new class extends Migration
 
     public function down(): void
     {
+<<<<<<< Updated upstream
         if (Schema::hasColumn('partners', 'school_name')) {
             Schema::table('partners', function (Blueprint $table) {
                 try {
@@ -74,6 +85,14 @@ return new class extends Migration
                 try {
                     $table->dropIndex(['city']);
                 } catch (\Exception $e) {}
+=======
+        if (Schema::hasColumn('partners', 'school_type')) {
+            Schema::table('partners', function (Blueprint $table) {
+                $table->dropIndex(['school_type']);
+                $table->dropIndex(['ownership_status']);
+                $table->dropIndex(['district']);
+                $table->dropIndex(['city']);
+>>>>>>> Stashed changes
 
                 $table->renameColumn('school_name',      'nama_sekolah');
                 $table->renameColumn('school_type',      'bentuk');
