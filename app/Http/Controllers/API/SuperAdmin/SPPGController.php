@@ -18,9 +18,16 @@ class SPPGController extends Controller
         private readonly SPPGCapacityService $capacityService,
     ) {}
 
+    // ─── Daftar SPPG ─────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/super-admin/sppg
+     * List all SPPGs with summary stats.
+     * Filters: status, city, district, search, per_page
+     */
     public function index(Request $request): JsonResponse
     {
-        $filters = $request->only(['status', 'kota', 'search']);
+        $filters = $request->only(['status', 'city', 'district', 'search']);
         $sppgs   = $this->sppgService->getAll($filters, $request->integer('per_page', 15));
 
         return response()->json([
@@ -36,17 +43,24 @@ class SPPGController extends Controller
         ]);
     }
 
-    public function store(\App\Http\Requests\SPPG\RegisterSppgRequest $request, \App\Services\SPPG\SppgRegistrationService $registrationService): JsonResponse  //error
+    /**
+     * POST /api/super-admin/sppg
+     */
+    public function store(\App\Http\Requests\SPPG\RegisterSppgRequest $request, \App\Services\SPPG\SppgRegistrationService $registrationService): JsonResponse
     {
         $sppg = $registrationService->register($request->validated());
 
         return response()->json([
             'success' => true,
-            'message' => 'SPPG berhasil ditambahkan.',
+            'message' => 'SPPG registered successfully.',
             'data'    => new SPPGResource($sppg),
         ], 201);
     }
 
+    /**
+     * GET /api/super-admin/sppg/{id}
+     * Detail SPPG — includes capacity breakdown.
+     */
     public function show(string $id): JsonResponse
     {
         $sppg = $this->sppgService->findById($id);
@@ -64,7 +78,7 @@ class SPPGController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'SPPG berhasil diperbarui.',
+            'message' => 'SPPG updated successfully.',
             'data'    => new SPPGResource($sppg),
         ]);
     }
@@ -73,17 +87,13 @@ class SPPGController extends Controller
     {
         \Illuminate\Support\Facades\DB::transaction(function() use ($id) {
             $this->sppgService->delete($id);
-
-            // Deactivate all users of this SPPG
             \App\Models\User::where('sppg_id', $id)->update(['is_active' => false]);
-
-            // Detach all partners
             \App\Models\Partner::where('sppg_id', $id)->update(['sppg_id' => null]);
         });
 
         return response()->json([
             'success' => true,
-            'message' => 'SPPG berhasil dihapus.',
+            'message' => 'SPPG deleted successfully.',
         ]);
     }
 
@@ -93,13 +103,12 @@ class SPPGController extends Controller
             $sppg = \App\Models\SPPG::findOrFail($id);
             $sppg->status = 'inactive';
             $sppg->save();
-
             \App\Models\User::where('sppg_id', $id)->update(['is_active' => false]);
         });
 
         return response()->json([
             'success' => true,
-            'message' => 'SPPG berhasil dinonaktifkan.',
+            'message' => 'SPPG deactivated successfully.',
         ]);
     }
 
@@ -109,28 +118,61 @@ class SPPGController extends Controller
             $sppg = \App\Models\SPPG::findOrFail($id);
             $sppg->status = 'active';
             $sppg->save();
-
             \App\Models\User::where('sppg_id', $id)->update(['is_active' => true]);
         });
 
         return response()->json([
             'success' => true,
-            'message' => 'SPPG berhasil diaktifkan kembali.',
+            'message' => 'SPPG activated successfully.',
         ]);
     }
 
+    // ─── Region Dropdown Endpoints ────────────────────────────────────────────
+
+    /**
+     * GET /api/super-admin/sppg/regions/cities
+     * Return distinct cities that have at least one SPPG — for the first dropdown.
+     */
+    public function regionCities(): JsonResponse
+    {
+        $cities = $this->sppgService->getAvailableCities();
+
+        return response()->json([
+            'success' => true,
+            'data'    => $cities,
+        ]);
+    }
+
+    /**
+     * GET /api/super-admin/sppg/regions/districts?city=Kota+Malang
+     * Return districts in the selected city — for the dependent second dropdown.
+     */
+    public function regionDistricts(Request $request): JsonResponse
+    {
+        $request->validate(['city' => 'required|string']);
+
+        $districts = $this->sppgService->getAvailableDistricts($request->input('city'));
+
+        return response()->json([
+            'success' => true,
+            'data'    => $districts,
+        ]);
+    }
+
+    // ─── Detail Tabs ──────────────────────────────────────────────────────────
+
+    /**
+     * GET /api/super-admin/sppg/{id}/partners
+     * Tab Mitra — show all partner schools under this SPPG with distance info.
+     */
     public function partners(string $id, \App\Services\SuperAdmin\MapService $mapService): JsonResponse
     {
-        $sppg = \App\Models\SPPG::findOrFail($id);
-        $partners = \App\Models\Partner::where('sppg_id', $sppg->id)->get();
+        $sppg     = \App\Models\SPPG::findOrFail($id);
+        $partners = $this->sppgService->getPartners($id);
 
         $data = $partners->map(function ($p) use ($sppg, $mapService) {
-            $dist = $mapService->calculateHaversineDistance($sppg->latitude, $sppg->longitude, $p->latitude, $p->longitude);
-            
-            // Get OSRM duration and distance if available
+            $dist  = $mapService->calculateHaversineDistance($sppg->latitude, $sppg->longitude, $p->latitude, $p->longitude);
             $route = $mapService->getRouteDurationAndDistance($sppg->latitude, $sppg->longitude, $p->latitude, $p->longitude);
-            
-            $status = $dist <= 5.0 ? 'safe' : 'review';
 
             return [
                 'id'                => $p->id,
@@ -146,32 +188,37 @@ class SPPGController extends Controller
                 'portion_count'     => $p->portion_count,
                 'distance_km'       => $dist,
                 'estimated_minutes' => $route ? $route['duration_minutes'] : null,
-                'distance_status'   => $status,
+                'distance_status'   => $dist <= 5.0 ? 'safe' : 'review',
             ];
         });
 
         return response()->json([
-            'success' => true,
-            'data' => $data,
+            'success'       => true,
+            'sppg_id'       => $sppg->id,
+            'sppg_name'     => $sppg->name,
+            'total_partners'=> $data->count(),
+            'total_portion' => $data->sum('portion_count'),
+            'data'          => $data->values(),
         ]);
     }
 
+    /**
+     * GET /api/super-admin/sppg/{id}/menus
+     * Tab Menu — all menus grouped by period with recipes per day.
+     * Order: published → scheduled → planned → archived
+     */
     public function menus(string $id): JsonResponse
     {
-        $menus = \App\Models\Menu::with(['menuItems.recipe'])
-            ->orderByRaw("CASE 
-                WHEN status = 'published' THEN 1 
-                WHEN status = 'scheduled' THEN 2 
-                WHEN status = 'planned' THEN 3 
-                WHEN status = 'archived' THEN 4 
-                ELSE 5 
-             END")
-            ->orderBy('week_start', 'asc')
-            ->get();
+        // Verify SPPG exists
+        \App\Models\SPPG::findOrFail($id);
+
+        $periods = $this->sppgService->getMenusGrouped($id);
 
         return response()->json([
-            'success' => true,
-            'data' => \App\Http\Resources\MenuResource::collection($menus),
+            'success'      => true,
+            'sppg_id'      => $id,
+            'total_periods'=> count($periods),
+            'data'         => $periods,
         ]);
     }
 
@@ -182,7 +229,7 @@ class SPPGController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Sekolah berhasil ditambahkan ke SPPG.',
+            'message' => 'School assigned to SPPG successfully.',
         ]);
     }
 
@@ -192,7 +239,7 @@ class SPPGController extends Controller
 
         return response()->json([
             'success' => true,
-            'message' => 'Sekolah berhasil dilepas dari SPPG.',
+            'message' => 'School detached from SPPG successfully.',
         ]);
     }
 

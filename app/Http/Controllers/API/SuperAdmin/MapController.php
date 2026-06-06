@@ -5,6 +5,7 @@ namespace App\Http\Controllers\API\SuperAdmin;
 use App\Http\Controllers\Controller;
 use App\Models\SPPG;
 use App\Models\SppgDraft;
+use App\Models\SppgDraftPartner;
 use App\Services\SuperAdmin\MapService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -12,108 +13,45 @@ use Illuminate\Support\Facades\Http;
 
 class MapController extends Controller
 {
-    /**
-     * GET /api/super-admin/map/data
-     * Get all map data (SPPG layers, draft layers, and recommendations).
-     */
+    // ─── GET /api/super-admin/map/data ──────────────────────────────────────────
+    // Satu-satunya endpoint yang perlu dipanggil FE untuk render peta lengkap.
     public function getMapData(Request $request, MapService $mapService): JsonResponse
     {
-        $sppgLayers = $this->getSppgLayersData();
-        $submissionLayers = $this->getSubmissionLayersData();
-        $recommendations = $mapService->getKMeansRecommendations();
-
         return response()->json([
-            'success' => true,
-            'sppg_layers' => $sppgLayers,
-            'submission_layers' => $submissionLayers,
-            'recommendations' => $recommendations,
+            'success'           => true,
+            'sppg_layers'       => $this->buildSppgLayers(),
+            'submission_layers' => $this->buildSubmissionLayers(),
+            'recommendations'   => $mapService->getKMeansRecommendations(),
+            'schools'           => $mapService->getSchoolsLayerData(),
         ]);
     }
 
-    /**
-     * GET /api/super-admin/map/sppg-layers
-     * Get active SPPG layers and their partners.
-     */
-    public function getSppgLayers(Request $request): JsonResponse
-    {
-        return response()->json([
-            'success' => true,
-            'data' => $this->getSppgLayersData(),
-        ]);
-    }
-
-    /**
-     * GET /api/super-admin/map/submission-layers
-     * Get draft submissions that have coordinates.
-     */
-    public function getSubmissionLayers(Request $request): JsonResponse
-    {
-        return response()->json([
-            'success' => true,
-            'data' => $this->getSubmissionLayersData(),
-        ]);
-    }
-
-    /**
-     * GET /api/super-admin/map/recommendations
-     * Get system recommendations for placing SPPGs based on K-Means clustering.
-     */
-    public function getRecommendations(Request $request, MapService $mapService): JsonResponse
-    {
-        $recommendations = $mapService->getKMeansRecommendations();
-        return response()->json([
-            'success' => true,
-            'data' => $recommendations,
-        ]);
-    }
-
-    /**
-     * POST /api/super-admin/map/geocode
-     * Proxy Nominatim Geocoding API with required User-Agent headers.
-     */
+    // ─── POST /api/super-admin/map/geocode ──────────────────────────────────────
     public function geocode(Request $request): JsonResponse
     {
         $query = $request->input('query') ?? $request->input('address');
         if (empty($query)) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Query atau alamat pencarian wajib diisi.',
-            ], 400);
+            return response()->json(['success' => false, 'message' => 'Query wajib diisi.'], 400);
         }
 
-        $url = "https://nominatim.openstreetmap.org/search?q=" . urlencode($query) . "&format=json&limit=5";
+        $url = 'https://nominatim.openstreetmap.org/search?q=' . urlencode($query) . '&format=json&limit=5';
 
         try {
-            $response = Http::timeout(5)
-                ->withHeaders([
-                    'User-Agent' => 'COMS-MBG-SuperAdmin/1.0',
-                    'Accept' => 'application/json',
-                ])
+            $res = Http::timeout(5)
+                ->withHeaders(['User-Agent' => 'COMS-MBG-SuperAdmin/1.0', 'Accept' => 'application/json'])
                 ->get($url);
 
-            if ($response->successful()) {
-                return response()->json([
-                    'success' => true,
-                    'data' => $response->json(),
-                ]);
+            if ($res->successful()) {
+                return response()->json(['success' => true, 'data' => $res->json()]);
             }
         } catch (\Exception $e) {
-            return response()->json([
-                'success' => false,
-                'message' => 'Gagal terhubung dengan server geocoding: ' . $e->getMessage(),
-            ], 500);
+            return response()->json(['success' => false, 'message' => 'Gagal ke server geocoding: ' . $e->getMessage()], 500);
         }
 
-        return response()->json([
-            'success' => false,
-            'message' => 'Geocoding menggunakan Nominatim gagal.',
-        ], 500);
+        return response()->json(['success' => false, 'message' => 'Geocoding gagal.'], 500);
     }
 
-    /**
-     * POST /api/super-admin/map/route-check
-     * Proxy OSRM Routing API with required User-Agent headers.
-     */
+    // ─── POST /api/super-admin/map/route-check ──────────────────────────────────
     public function routeCheck(Request $request, MapService $mapService): JsonResponse
     {
         $request->validate([
@@ -123,146 +61,176 @@ class MapController extends Controller
             'lon_b' => 'required|numeric',
         ]);
 
-        $latA = $request->input('lat_a');
-        $lonA = $request->input('lon_a');
-        $latB = $request->input('lat_b');
-        $lonB = $request->input('lon_b');
+        $route = $mapService->getRouteDurationAndDistance(
+            $request->lat_a, $request->lon_a,
+            $request->lat_b, $request->lon_b
+        );
 
-        $route = $mapService->getRouteDurationAndDistance($latA, $lonA, $latB, $lonB);
-
-        if ($route) {
-            return response()->json([
-                'success' => true,
-                'data' => $route,
-            ]);
-        }
-
-        return response()->json([
-            'success' => false,
-            'message' => 'Gagal mendapatkan estimasi rute dari OSRM.',
-        ], 500);
+        return $route
+            ? response()->json(['success' => true, 'data' => $route])
+            : response()->json(['success' => false, 'message' => 'Gagal mendapat rute dari OSRM.'], 500);
     }
 
-    /**
-     * POST /api/super-admin/map/validate-point
-     * Validate coordinates suitability based on distance to other SPPGs and takeover rules.
-     */
+    // ─── POST /api/super-admin/map/validate-point ───────────────────────────────
     public function validatePoint(Request $request, MapService $mapService): JsonResponse
     {
         $request->validate([
-            'latitude' => 'required|numeric',
+            'latitude'  => 'required|numeric',
             'longitude' => 'required|numeric',
-            'draft_id' => 'nullable|exists:sppg_drafts,id',
-            'partners' => 'nullable|array|max:100',
+            'draft_id'  => 'nullable|exists:sppg_drafts,id',
+            'partners'  => 'nullable|array|max:100',
         ]);
 
-        $lat = $request->input('latitude');
-        $lng = $request->input('longitude');
+        $partners = $this->resolvePartners($request);
+        $result   = $mapService->validatePoint($request->latitude, $request->longitude, $partners);
 
-        $partners = [];
-        if ($request->has('partners')) {
-            $partners = $request->input('partners');
-        } elseif ($request->has('draft_id')) {
-            $draft = SppgDraft::with('partners')->find($request->input('draft_id'));
-            if ($draft) {
-                $partners = $draft->partners->toArray();
-            }
-        }
-
-        $validation = $mapService->validatePoint($lat, $lng, $partners);
-
-        return response()->json([
-            'success' => true,
-            'data' => $validation,
-        ]);
+        return response()->json(['success' => true, 'data' => $result]);
     }
 
-    /**
-     * POST /api/super-admin/map/suggest-shift
-     * Suggest shifting centroid for draft partners within range.
-     */
+    // ─── POST /api/super-admin/map/suggest-shift ────────────────────────────────
     public function suggestShift(Request $request, MapService $mapService): JsonResponse
     {
         $request->validate([
-            'latitude' => 'required|numeric',
+            'latitude'  => 'required|numeric',
             'longitude' => 'required|numeric',
-            'draft_id' => 'nullable|exists:sppg_drafts,id',
-            'partners' => 'nullable|array|max:100',
+            'draft_id'  => 'nullable|exists:sppg_drafts,id',
+            'partners'  => 'nullable|array|max:100',
         ]);
 
-        $lat = $request->input('latitude');
-        $lng = $request->input('longitude');
+        $partners = $this->resolvePartners($request);
+        $suggest  = $mapService->suggestCentroidShift($request->latitude, $request->longitude, $partners);
 
-        $partners = [];
-        if ($request->has('partners')) {
-            $partners = $request->input('partners');
-        } elseif ($request->has('draft_id')) {
-            $draft = SppgDraft::with('partners')->find($request->input('draft_id'));
-            if ($draft) {
-                $partners = $draft->partners->toArray();
-            }
-        }
-
-        $suggest = $mapService->suggestCentroidShift($lat, $lng, $partners);
-
-        return response()->json([
-            'success' => true,
-            'data' => $suggest,
-        ]);
+        return response()->json(['success' => true, 'data' => $suggest]);
     }
 
-    /**
-     * POST /api/super-admin/map/confirm-point/{submission_id}
-     * Confirm point and save to draft.
-     */
+    // ─── POST /api/super-admin/map/confirm-point/{submission_id} ────────────────
+    // Simpan koordinat yang dikonfirmasi + rekomendasi mitra ke draft.
     public function confirmPoint(Request $request, string $submissionId, MapService $mapService): JsonResponse
     {
         $request->validate([
-            'latitude' => 'required|numeric',
+            'latitude'  => 'required|numeric',
             'longitude' => 'required|numeric',
+            'capacity'  => 'nullable|integer|min:1',
         ]);
 
-        $draft = SppgDraft::with('partners')->findOrFail($submissionId);
+        $draft       = SppgDraft::with('partners')->findOrFail($submissionId);
+        $confirmedLat = (float) $request->latitude;
+        $confirmedLng = (float) $request->longitude;
+        $capacity     = (int)   ($request->capacity ?? 3000);
 
-        $confirmedLat = (float) $request->input('latitude');
-        $confirmedLng = (float) $request->input('longitude');
-
+        // Validasi status titik
         $validation = $mapService->validatePoint($confirmedLat, $confirmedLng, $draft->partners->toArray());
 
+        // Simpan koordinat + status ke draft
         $draft->update([
-            'confirmed_latitude' => $confirmedLat,
+            'confirmed_latitude'  => $confirmedLat,
             'confirmed_longitude' => $confirmedLng,
-            'point_status' => $validation['status'],
-            'map_confirmed' => true,
+            'point_status'        => $validation['status'],
+            'map_confirmed'       => true,
         ]);
+
+        // Update lat/lng di form1_data juga agar pengajuan membawa koordinat terkonfirmasi
+        $form1 = $draft->form1_data ?? [];
+        $form1['latitude']  = $confirmedLat;
+        $form1['longitude'] = $confirmedLng;
+        $draft->update(['form1_data' => $form1]);
+
+        // Rekomendasi mitra dari sistem berdasarkan titik terkonfirmasi
+        $recommendedPartners = $mapService->recommendPartnersForPoint($confirmedLat, $confirmedLng, $capacity);
+
+        // Tandai mitra rekomendasi yg belum ada di draft, tambahkan sebagai draft partner
+        $existingNpsns = $draft->partners->pluck('npsn')->filter()->toArray();
+
+        foreach ($recommendedPartners as $rp) {
+    if (!empty($rp['npsn']) && in_array($rp['npsn'], $existingNpsns)) continue;
+
+    SppgDraftPartner::create([
+        'draft_id'     => $draft->id,
+        'school_name'  => $rp['school_name'],
+        'npsn'         => $rp['npsn']     ?? null,
+        'level'        => $rp['level']    ?? 'SMA',      // fallback, Admin SPPG lengkapi nanti
+        'school_status'=> $rp['school_status'] ?? 'negeri', // fallback
+        'address'      => $rp['address']  ?? $rp['district'] . ', ' . $rp['city'],
+        'city'         => $rp['city']     ?? '',
+        'district'     => $rp['district'] ?? '',
+        'latitude'     => $rp['latitude'],
+        'longitude'    => $rp['longitude'],
+        'jumlah_porsi' => $rp['portion_count'] ?? 0,
+        'data_source'  => 'database',  // bukan system_recommendation
+    ]);
+}
 
         return response()->json([
-            'success' => true,
-            'message' => 'Titik koordinat berhasil dikonfirmasi.',
-            'data' => $draft->load('partners'),
+            'success'     => true,
+            'message'     => 'Titik dikonfirmasi. Rekomendasi mitra telah ditambahkan ke draft.',
+            'point_status'=> $validation['status'],
+            'conflicts'   => $validation['conflicts'],
+            'data'        => $draft->fresh('partners'),
         ]);
     }
 
-    /**
-     * Fetch SPPG layers data helper
-     */
-    private function getSppgLayersData(): array
+    // ─── Private helpers ────────────────────────────────────────────────────────
+
+    private function resolvePartners(Request $request): array
     {
-        return SPPG::where('status', 'active')
-            ->with('partners')
-            ->get()
-            ->toArray();
+        if ($request->has('partners')) {
+            return $request->input('partners');
+        }
+        if ($request->has('draft_id')) {
+            $draft = SppgDraft::with('partners')->find($request->input('draft_id'));
+            return $draft ? $draft->partners->toArray() : [];
+        }
+        return [];
     }
 
-    /**
-     * Fetch submission layers data helper
-     */
-    private function getSubmissionLayersData(): array
+    private function buildSppgLayers(): array
+    {
+        return SPPG::where('status', 'active')
+            ->with(['partners' => fn($q) => $q->select('id', 'sppg_id', 'school_name', 'latitude', 'longitude', 'portion_count')])
+            ->get()
+            ->map(fn($s) => [
+                'id'        => $s->id,
+                'name'      => $s->name,
+                'latitude'  => $s->latitude,
+                'longitude' => $s->longitude,
+                'status'    => $s->status,
+                'capacity'  => $s->capacity,
+                'partners'  => $s->partners->map(fn($p) => [
+                    'id'            => $p->id,
+                    'school_name'   => $p->school_name,
+                    'latitude'      => $p->latitude,
+                    'longitude'     => $p->longitude,
+                    'portion_count' => $p->portion_count,
+                ])->values()->all(),
+            ])
+            ->values()->all();
+    }
+
+    private function buildSubmissionLayers(): array
     {
         return SppgDraft::whereNotNull('latitude')
             ->whereNotNull('longitude')
-            ->with('partners')
+            ->with(['partners' => fn($q) => $q->select('id', 'draft_id', 'school_name', 'latitude', 'longitude', 'jumlah_porsi', 'data_source')])
             ->get()
-            ->toArray();
+            ->map(fn($d) => [
+                'id'                  => $d->id,
+                'submission_number'   => $d->submission_number,
+                'latitude'            => $d->latitude,
+                'longitude'           => $d->longitude,
+                'confirmed_latitude'  => $d->confirmed_latitude,
+                'confirmed_longitude' => $d->confirmed_longitude,
+                'point_status'        => $d->point_status,
+                'map_confirmed'       => $d->map_confirmed,
+                'status'              => $d->status,
+                'partners'            => $d->partners->map(fn($p) => [
+                    'id'           => $p->id,
+                    'school_name'  => $p->school_name,
+                    'latitude'     => $p->latitude,
+                    'longitude'    => $p->longitude,
+                    'jumlah_porsi' => $p->jumlah_porsi,
+                    'data_source'  => $p->data_source,
+                ])->values()->all(),
+            ])
+            ->values()->all();
     }
 }

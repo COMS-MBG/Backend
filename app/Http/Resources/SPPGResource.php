@@ -30,9 +30,14 @@ class SPPGResource extends JsonResource
                 'id'   => $this->owner?->id,
                 'name' => $this->owner?->name,
             ]),
-            'total_mitra'            => (int) ($this->partners_count ?? $this->partners()->count()),
-            'total_porsi'            => (int) ($this->total_porsi ?? $this->partners()->sum('portion_count')),
-            'total_penerima_manfaat' => (int) ($this->total_porsi ?? $this->partners()->sum('portion_count')),
+
+            // Partner (mitra) stats — sourced from partners table (portion_count = jumlah porsi makan)
+            'total_partners'     => (int) ($this->partners_count ?? $this->partners()->count()),
+            'total_portions'     => (int) ($this->total_porsi    ?? $this->partners()->sum('portion_count')),
+            // total_beneficiaries = same as portions in Phase 1 (1 portion = 1 student)
+            // Can be decoupled later when student headcount data is available separately
+            'total_beneficiaries'=> (int) ($this->total_porsi    ?? $this->partners()->sum('portion_count')),
+
             'schools_count'    => $this->whenCounted('schools'),
             'schools'          => SchoolResource::collection($this->whenLoaded('schools')),
             'capacity_status'  => $this->when(

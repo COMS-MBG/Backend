@@ -17,26 +17,40 @@ class FinancialReportController extends Controller implements HasMiddleware
     public static function middleware(): array
     {
         return [
-            new Middleware('permission:finance.read', only: ['index', 'show']),
-            new Middleware('permission:finance.create', only: ['store']),
-            new Middleware('permission:finance.update', only: ['update']),
-            new Middleware('permission:finance.delete', only: ['destroy']),
+            new Middleware('permission:report.read',   only: ['index', 'rates']),
+            new Middleware('permission:report.update', only: ['updateRate']),
         ];
-    }
-    /**
-     * Display a listing of the resource.
-     */
-    public function index()
-    {
-        //
     }
 
     /**
-     * Store a newly created resource in storage.
+     * GET /api/admin-sppg/reports/financial
+     *
+     * Query params:
+     *   date_from   (Y-m-d, default: 7 days ago)
+     *   date_to     (Y-m-d, default: today)
      */
-    public function store(Request $request)
+    public function index(Request $request): JsonResponse
     {
-        //
+        $request->validate([
+            'date_from' => 'nullable|date',
+            'date_to'   => 'nullable|date|after_or_equal:date_from',
+        ]);
+
+        $sppgId   = $request->user()->sppg_id;
+        $dateFrom = $request->input('date_from', now()->subDays(6)->toDateString());
+        $dateTo   = $request->input('date_to', now()->toDateString());
+
+        $result = $this->reportService->getFinancialDeliveryReport($sppgId, $dateFrom, $dateTo);
+
+        $numbered = $result['data']->map(function ($row, $index) {
+            return array_merge(['no' => $index + 1], $row);
+        })->values();
+
+        return response()->json([
+            'success' => true,
+            'summary' => $result['summary'],
+            'data'    => $numbered,
+        ]);
     }
 
     /**
