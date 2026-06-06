@@ -20,7 +20,7 @@ return new class extends Migration
             $table->decimal('latitude', 10, 7)->nullable();
             $table->decimal('longitude', 10, 7)->nullable();
             $table->unsignedInteger('portion_count')->default(0);
-            $table->uuid('sppg_id')->nullable()->index();
+            $table->unsignedBigInteger('sppg_id')->nullable()->index();
             $table->timestamps();
             $table->softDeletes();
 

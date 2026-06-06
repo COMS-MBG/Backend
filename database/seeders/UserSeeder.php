@@ -51,7 +51,7 @@ class UserSeeder extends Seeder
                 'email'    => 'naufal@sppg.test',
                 'password' => '122004',
                 'phone'    => '0813855550999',
-                'role'     => 'sppg_admin',
+                'role'     => 'admin-sppg',
                 'position' => 'owner',
             ],
             [
@@ -59,7 +59,7 @@ class UserSeeder extends Seeder
                 'email'    => 'hilman@sppg.test',
                 'password' => '122003',
                 'phone'    => '081384440888',
-                'role'     => 'nutritionist',
+                'role'     => 'ahli-gizi',
                 'position' => 'nutritionist',
             ],
             [
@@ -67,7 +67,7 @@ class UserSeeder extends Seeder
                 'email'    => 'adit@sppg.test',
                 'password' => '122002',
                 'phone'    => '081383330777',
-                'role'     => 'logistics_admin',
+                'role'     => 'admin-logistik',
                 'position' => 'logistics_admin',
             ],
             [
@@ -75,7 +75,7 @@ class UserSeeder extends Seeder
                 'email'    => 'asep@sppg.test',
                 'password' => '122001',
                 'phone'    => '081381110555',
-                'role'     => 'courier',
+                'role'     => 'kurir',
                 'position' => 'courier',
             ],
             [
@@ -83,7 +83,7 @@ class UserSeeder extends Seeder
                 'email'    => 'bambang@sppg.test',
                 'password' => '122005',
                 'phone'    => '081382220666',
-                'role'     => 'courier',
+                'role'     => 'kurir',
                 'position' => 'courier',
             ],
         ];

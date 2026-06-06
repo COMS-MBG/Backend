@@ -32,10 +32,7 @@ class DatabaseSeeder extends Seeder
             PartnerSeeder::class,
             IngredientSeeder::class,
             RecipeSeeder::class,
-<<<<<<< Updated upstream
-            SchoolSeeder::class,
             DistributionSeeder::class,
-=======
             MenuSeeder::class,
             DeliveryScheduleSeeder::class,
             FeedbackSeeder::class,
@@ -44,7 +41,6 @@ class DatabaseSeeder extends Seeder
             RatingSeeder::class,
             RecommendationSeeder::class,
             SPPGSubmissionSeeder::class,
->>>>>>> Stashed changes
         ]);
     }
 }

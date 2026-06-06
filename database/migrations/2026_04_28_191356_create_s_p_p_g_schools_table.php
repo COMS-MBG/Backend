@@ -11,9 +11,17 @@ return new class extends Migration
      */
     public function up(): void
     {
-        Schema::create('s_p_p_g_schools', function (Blueprint $table) {
-            $table->id();
+        Schema::create('sppg_schools', function (Blueprint $table) {
+            $table->uuid('id')->primary();
+            $table->unsignedBigInteger('sppg_id');
+            $table->unsignedBigInteger('school_id');
+            $table->date('tanggal_bergabung')->nullable();
+            $table->string('status', 50)->default('aktif');
+            $table->text('catatan')->nullable();
             $table->timestamps();
+
+            $table->foreign('sppg_id')->references('id')->on('s_p_p_g_s')->onDelete('cascade');
+            $table->foreign('school_id')->references('id')->on('schools')->onDelete('cascade');
         });
     }
 
@@ -22,6 +30,6 @@ return new class extends Migration
      */
     public function down(): void
     {
-        Schema::dropIfExists('s_p_p_g_schools');
+        Schema::dropIfExists('sppg_schools');
     }
 };

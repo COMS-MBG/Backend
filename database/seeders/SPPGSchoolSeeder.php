@@ -14,8 +14,8 @@ class SPPGSchoolSeeder extends Seeder
      */
     public function run(): void
     {
-        $sppgUtara   = SPPG::where('nama', 'SPPG Bandung Utara')->first();
-        $sppgSelatan = SPPG::where('nama', 'SPPG Bandung Selatan')->first();
+        $sppgUtara   = SPPG::where('name', 'SPPG Bandung Utara')->first();
+        $sppgSelatan = SPPG::where('name', 'SPPG Bandung Selatan')->first();
 
         // 1. Ambil semua sekolah
         $schools = School::all();
