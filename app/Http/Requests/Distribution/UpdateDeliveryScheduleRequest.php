@@ -8,7 +8,7 @@ class UpdateDeliveryScheduleRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->hasAnyRole(['admin_logistik','admin_sppg']) ?? false;
+        return $this->user()?->hasAnyRole(['logistics_admin', 'sppg_admin']) ?? false;
     }
 
     public function rules(): array

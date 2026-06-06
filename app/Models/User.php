@@ -118,22 +118,27 @@ class User extends Authenticatable
         $normalizedRoles = [];
         foreach ($roles as $role) {
             $normalizedRoles[] = $role;
-            if ($role === 'courier') {
-                $normalizedRoles[] = 'kurir';
-            } elseif ($role === 'kurir') {
+            if (in_array($role, ['courier', 'kurir'], true)) {
                 $normalizedRoles[] = 'courier';
-            } elseif ($role === 'admin_logistik') {
-                $normalizedRoles[] = 'admin-logistik';
-            } elseif ($role === 'admin-logistik') {
+                $normalizedRoles[] = 'kurir';
+            } elseif (in_array($role, ['logistics_admin', 'admin_logistik', 'admin-logistik'], true)) {
+                $normalizedRoles[] = 'logistics_admin';
                 $normalizedRoles[] = 'admin_logistik';
-            } elseif ($role === 'admin_sppg') {
-                $normalizedRoles[] = 'admin-sppg';
-            } elseif ($role === 'admin-sppg') {
+                $normalizedRoles[] = 'admin-logistik';
+            } elseif (in_array($role, ['sppg_admin', 'admin_sppg', 'admin-sppg'], true)) {
+                $normalizedRoles[] = 'sppg_admin';
                 $normalizedRoles[] = 'admin_sppg';
-            } elseif ($role === 'ahli_gizi') {
-                $normalizedRoles[] = 'ahli-gizi';
-            } elseif ($role === 'ahli-gizi') {
+                $normalizedRoles[] = 'admin-sppg';
+            } elseif (in_array($role, ['nutritionist', 'ahli_gizi', 'ahli-gizi'], true)) {
+                $normalizedRoles[] = 'nutritionist';
                 $normalizedRoles[] = 'ahli_gizi';
+                $normalizedRoles[] = 'ahli-gizi';
+            } elseif (in_array($role, ['owner', 'pemilik'], true)) {
+                $normalizedRoles[] = 'owner';
+                $normalizedRoles[] = 'pemilik';
+            } elseif (in_array($role, ['manager', 'manajer'], true)) {
+                $normalizedRoles[] = 'manager';
+                $normalizedRoles[] = 'manajer';
             }
         }
 

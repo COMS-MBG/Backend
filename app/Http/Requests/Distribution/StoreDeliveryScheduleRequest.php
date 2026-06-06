@@ -13,7 +13,7 @@ class StoreDeliveryScheduleRequest extends FormRequest
     public function authorize(): bool
     {
         // Only Admin Logistik role allowed
-        return $this->user()?->hasAnyRole(['admin_logistik', 'admin_sppg']) ?? false;
+        return $this->user()?->hasAnyRole(['logistics_admin', 'sppg_admin']) ?? false;
     }
 
     public function rules(): array

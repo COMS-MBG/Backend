@@ -104,7 +104,7 @@ class RouteOptimizationService
         $url = "{$this->osrmBase}/route/v1/driving/{$coordStr}";
 
         try {
-            $response = Http::timeout(10)->get($url, [
+            $response = Http::withoutVerifying()->timeout(10)->get($url, [
                 'overview'    => 'full',
                 'geometries'  => 'geojson',
                 'steps'       => 'false',
