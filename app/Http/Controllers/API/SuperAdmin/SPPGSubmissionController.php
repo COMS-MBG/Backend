@@ -9,6 +9,8 @@ use App\Services\SPPG\SppgRegistrationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class SppgSubmissionController extends Controller
 {
@@ -173,10 +175,10 @@ class SppgSubmissionController extends Controller
      * POST /api/super-admin/sppg-submissions/{id}/submit
      * Submit draft and convert to registered SPPG.
      */
-    public function submit(Request $request, string $id, SppgRegistrationService $registrationService): JsonResponse
-    {
+    public function submit(Request $request, string $id,SppgRegistrationService $registrationService) : JsonResponse {
         $draft = SppgDraft::with('partners')->findOrFail($id);
 
+        // ── Guard 1: Status check ────────────────────────────────────────────
         if ($draft->status !== 'draft') {
             return response()->json([
                 'success' => false,
@@ -184,6 +186,7 @@ class SppgSubmissionController extends Controller
             ], 422);
         }
 
+        // ── Guard 2: Form data lengkap ────────────────────────────────────────
         if (empty($draft->form1_data) || empty($draft->form2_data)) {
             return response()->json([
                 'success' => false,
@@ -191,39 +194,97 @@ class SppgSubmissionController extends Controller
             ], 422);
         }
 
+        // ── Guard 3: Ada minimal 1 mitra ──────────────────────────────────────
         if ($draft->partners->isEmpty()) {
             return response()->json([
                 'success' => false,
-                'message' => 'Draft harus memiliki minimal 1 sekolah mitra (Form 2).',
+                'message' => 'Draft harus memiliki minimal 1 sekolah mitra. Jika belum ada rekomendasi, minta SuperAdmin confirm titik di Map terlebih dahulu.',
+                'hint'    => 'Setiap rekomendasi akan ditambahkan saat SuperAdmin confirm titik SPPG.',
             ], 422);
         }
 
+        // ── Guard 4: Map sudah dikonfirmasi ───────────────────────────────────
+        if (!$draft->map_confirmed) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Titik koordinat SPPG belum dikonfirmasi di Map Rekomendasi. SuperAdmin harus confirm titik terlebih dahulu untuk mendapat rekomendasi mitra.',
+            ], 422);
+        }
+
+        // ── STEP 1: Auto-geocode mitra yang belum punya koordinat ────────────
+        foreach ($draft->partners as $partner) {
+            if (!empty($partner->latitude) && !empty($partner->longitude)) {
+                continue; // Sudah punya koordinat
+            }
+
+            $address = implode(', ', array_filter([
+                $partner->school_name,
+                $partner->address,
+                $partner->district,
+                $partner->city,
+            ]));
+
+            $url = 'https://nominatim.openstreetmap.org/search?q='
+                . urlencode($address)
+                . '&format=json&limit=1';
+
+            try {
+                $res = Http::timeout(5)
+                    ->withHeaders(['User-Agent' => 'COMS-MBG-SuperAdmin/1.0'])
+                    ->get($url);
+
+                if ($res->successful() && !empty($res->json()[0])) {
+                    $geo = $res->json()[0];
+                    $partner->update([
+                        'latitude'  => (float) $geo['lat'],
+                        'longitude' => (float) $geo['lon'],
+                    ]);
+                }
+            } catch (\Exception $e) {
+                Log::warning("Geocode mitra gagal: {$partner->school_name} — " . $e->getMessage());
+            }
+        }
+
+        // ── STEP 2: Cek apakah semua mitra sudah punya koordinat ─────────────
+        $draft->refresh()->load('partners');
+        $missingCoords = $draft->partners
+            ->filter(fn($p) => empty($p->latitude) || empty($p->longitude))
+            ->pluck('school_name')
+            ->toArray();
+
+        if (!empty($missingCoords)) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Koordinat tidak ditemukan untuk mitra berikut: ' . implode(', ', $missingCoords) . '. Pastikan alamat mitra sudah lengkap dan benar.',
+                'missing_coords' => $missingCoords,
+            ], 422);
+        }
+
+        // ── STEP 3: Daftar SPPG (dalam transaction) ────────────────────────
         $sppg = DB::transaction(function () use ($draft, $registrationService) {
             $registrationData = [
                 'sppg'            => $draft->form1_data,
                 'admin_sppg'      => $draft->form2_data,
                 'nutritionist'    => $draft->form3_data['nutritionist'] ?? $draft->form3_data['ahli_gizi'] ?? null,
                 'logistics_admin' => $draft->form3_data['logistics_admin'] ?? $draft->form3_data['admin_logistik'] ?? null,
-                'partners' => $draft->partners->map(function ($p) {
-                    return [
-                        'school_name' => $p->school_name,
-                        'npsn' => $p->npsn,
-                        'school_type' => $p->level,
-                        'ownership_status' => $p->school_status,
-                        'address' => $p->address,
-                        'city' => $p->city,
-                        'district' => $p->district,
-                        'latitude' => $p->latitude,
-                        'longitude' => $p->longitude,
-                        'portion_count' => $p->jumlah_porsi,
-                    ];
-                })->toArray()
+                'partners'        => $draft->partners->map(fn($p) => [
+                    'school_name'      => $p->school_name,
+                    'npsn'             => $p->npsn,
+                    'school_type'      => $p->level,
+                    'ownership_status' => $p->school_status,
+                    'address'          => $p->address,
+                    'city'             => $p->city,
+                    'district'         => $p->district,
+                    'latitude'         => $p->latitude,
+                    'longitude'        => $p->longitude,
+                    'portion_count'    => $p->jumlah_porsi,
+                ])->toArray(),
             ];
 
             $sppgModel = $registrationService->register($registrationData);
 
             $draft->update([
-                'status' => 'registered',
+                'status'       => 'registered',
                 'submitted_at' => now(),
             ]);
 
@@ -233,7 +294,7 @@ class SppgSubmissionController extends Controller
         return response()->json([
             'success' => true,
             'message' => 'Pendaftaran SPPG berhasil diselesaikan.',
-            'data' => $sppg,
+            'data'    => $sppg,
         ]);
     }
 }

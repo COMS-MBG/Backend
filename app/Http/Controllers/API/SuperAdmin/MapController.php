@@ -10,11 +10,11 @@ use App\Services\SuperAdmin\MapService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 
 class MapController extends Controller
 {
     // ─── GET /api/super-admin/map/data ──────────────────────────────────────────
-    // Satu-satunya endpoint yang perlu dipanggil FE untuk render peta lengkap.
     public function getMapData(Request $request, MapService $mapService): JsonResponse
     {
         return response()->json([
@@ -51,7 +51,7 @@ class MapController extends Controller
         return response()->json(['success' => false, 'message' => 'Geocoding gagal.'], 500);
     }
 
-    // ─── POST /api/super-admin/map/route-check ──────────────────────────────────
+    // ─── POST /api/super-admin/map/route-check ──────────────────────────────
     public function routeCheck(Request $request, MapService $mapService): JsonResponse
     {
         $request->validate([
@@ -104,7 +104,14 @@ class MapController extends Controller
     }
 
     // ─── POST /api/super-admin/map/confirm-point/{submission_id} ────────────────
-    // Simpan koordinat yang dikonfirmasi + rekomendasi mitra ke draft.
+    /**
+     * FLOW LENGKAP:
+     * 1. Reverse geocode → update alamat SPPG
+     * 2. Validasi semua mitra (existing + baru)
+     * 3. Tandai mitra out of range
+     * 4. Tambahkan rekomendasi (merge, skip duplikat)
+     * 5. Simpan semuanya ke draft
+     */
     public function confirmPoint(Request $request, string $submissionId, MapService $mapService): JsonResponse
     {
         $request->validate([
@@ -113,59 +120,130 @@ class MapController extends Controller
             'capacity'  => 'nullable|integer|min:1',
         ]);
 
-        $draft       = SppgDraft::with('partners')->findOrFail($submissionId);
+        $draft        = SppgDraft::with('partners')->findOrFail($submissionId);
         $confirmedLat = (float) $request->latitude;
         $confirmedLng = (float) $request->longitude;
-        $capacity     = (int)   ($request->capacity ?? 3000);
+        $capacity     = (int) ($request->capacity ?? 3000);
 
-        // Validasi status titik
+        // ── 1. Validasi status titik ─────────────────────────────────────────
         $validation = $mapService->validatePoint($confirmedLat, $confirmedLng, $draft->partners->toArray());
 
-        // Simpan koordinat + status ke draft
+        // ── 2. Reverse geocoding → dapat alamat lengkap dari koordinat ───────
+        $addressData = $this->reverseGeocode($confirmedLat, $confirmedLng);
+
+        // ── 3. Update form1_data: lat/lng + alamat otomatis ──────────────────
+        $form1             = $draft->form1_data ?? [];
+        $form1['latitude'] = $confirmedLat;
+        $form1['longitude']= $confirmedLng;
+        
+        // Update alamat jika reverse geocode berhasil
+        if (!empty($addressData['address']))  $form1['address']  = $addressData['address'];
+        if (!empty($addressData['district'])) $form1['district'] = $addressData['district'];
+        if (!empty($addressData['city']))     $form1['city']     = $addressData['city'];
+        if (!empty($addressData['province'])) $form1['province'] = $addressData['province'];
+
+        // ── 4. Simpan koordinat + status + form1 ke draft ───────────────────
         $draft->update([
             'confirmed_latitude'  => $confirmedLat,
             'confirmed_longitude' => $confirmedLng,
             'point_status'        => $validation['status'],
             'map_confirmed'       => true,
+            'form1_data'          => $form1,
         ]);
 
-        // Update lat/lng di form1_data juga agar pengajuan membawa koordinat terkonfirmasi
-        $form1 = $draft->form1_data ?? [];
-        $form1['latitude']  = $confirmedLat;
-        $form1['longitude'] = $confirmedLng;
-        $draft->update(['form1_data' => $form1]);
+        // ── 5. Validasi & tandai mitra pengajuan yang out of range ─────────
+        $outOfRange = [];
+        foreach ($draft->partners as $partner) {
+            if (empty($partner->latitude) || empty($partner->longitude)) continue;
 
-        // Rekomendasi mitra dari sistem berdasarkan titik terkonfirmasi
+            $route  = $mapService->getRouteDurationAndDistance(
+                $confirmedLat, $confirmedLng,
+                $partner->latitude, $partner->longitude
+            );
+            $distKm = $route
+                ? $route['distance_km']
+                : $mapService->calculateHaversineDistance(
+                    $confirmedLat, $confirmedLng,
+                    $partner->latitude, $partner->longitude
+                  );
+            $durMin = $route ? $route['duration_minutes'] : 999.0;
+
+            $isOut = $distKm > 5.0 || $durMin > 30.0;
+            $partner->update([
+                'data_source' => $isOut ? 'out_of_range' : (
+                    $partner->data_source === 'out_of_range' ? 'manual' : $partner->data_source
+                ),
+            ]);
+
+            if ($isOut) {
+                $outOfRange[] = [
+                    'id'           => $partner->id,
+                    'school_name'  => $partner->school_name,
+                    'distance_km'  => round($distKm, 2),
+                    'duration_min' => round($durMin, 1),
+                ];
+            }
+        }
+
+        // ── 6. Tambahkan mitra rekomendasi (merge, skip duplikat) ──────────────
         $recommendedPartners = $mapService->recommendPartnersForPoint($confirmedLat, $confirmedLng, $capacity);
+        $draft->refresh()->load('partners');
 
-        // Tandai mitra rekomendasi yg belum ada di draft, tambahkan sebagai draft partner
-        $existingNpsns = $draft->partners->pluck('npsn')->filter()->toArray();
+        $existingNpsns  = $draft->partners->pluck('npsn')->filter()->toArray();
+        $existingCoords = $draft->partners
+            ->map(fn($p) => ['lat' => (float) $p->latitude, 'lng' => (float) $p->longitude])
+            ->toArray();
 
+        $addedPartners = [];
         foreach ($recommendedPartners as $rp) {
-    if (!empty($rp['npsn']) && in_array($rp['npsn'], $existingNpsns)) continue;
+            // Skip jika NPSN duplikat
+            if (!empty($rp['npsn']) && in_array($rp['npsn'], $existingNpsns)) continue;
 
-    SppgDraftPartner::create([
-        'draft_id'     => $draft->id,
-        'school_name'  => $rp['school_name'],
-        'npsn'         => $rp['npsn']     ?? null,
-        'level'        => $rp['level']    ?? 'SMA',      // fallback, Admin SPPG lengkapi nanti
-        'school_status'=> $rp['school_status'] ?? 'negeri', // fallback
-        'address'      => $rp['address']  ?? $rp['district'] . ', ' . $rp['city'],
-        'city'         => $rp['city']     ?? '',
-        'district'     => $rp['district'] ?? '',
-        'latitude'     => $rp['latitude'],
-        'longitude'    => $rp['longitude'],
-        'jumlah_porsi' => $rp['portion_count'] ?? 0,
-        'data_source'  => 'database',  // bukan system_recommendation
-    ]);
-}
+            // Skip jika koordinat duplikat (< 50m)
+            $isDuplicate = false;
+            foreach ($existingCoords as $ec) {
+                if ($mapService->calculateHaversineDistance(
+                    $rp['latitude'], $rp['longitude'], $ec['lat'], $ec['lng']
+                ) < 0.05) {
+                    $isDuplicate = true;
+                    break;
+                }
+            }
+            if ($isDuplicate) continue;
+
+            // Tambahkan mitra rekomendasi
+            SppgDraftPartner::create([
+                'draft_id'      => $draft->id,
+                'school_name'   => $rp['school_name'],
+                'npsn'          => $rp['npsn']          ?? null,
+                'level'         => $rp['level']         ?? 'SMA',
+                'school_status' => $rp['school_status'] ?? 'negeri',
+                'address'       => $rp['address']       ?? trim(($rp['district'] ?? '') . ', ' . ($rp['city'] ?? ''), ', '),
+                'city'          => $rp['city']          ?? '',
+                'district'      => $rp['district']      ?? '',
+                'latitude'      => $rp['latitude'],
+                'longitude'     => $rp['longitude'],
+                'jumlah_porsi'  => $rp['portion_count'] ?? 0,
+                'data_source'   => 'system_recommendation',
+            ]);
+
+            $addedPartners[] = $rp['school_name'];
+        }
 
         return response()->json([
-            'success'     => true,
-            'message'     => 'Titik dikonfirmasi. Rekomendasi mitra telah ditambahkan ke draft.',
-            'point_status'=> $validation['status'],
-            'conflicts'   => $validation['conflicts'],
-            'data'        => $draft->fresh('partners'),
+            'success'                => true,
+            'message'                => 'Titik dikonfirmasi. Alamat & rekomendasi mitra sudah diupdate.',
+            'point_status'           => $validation['status'],
+            'conflicts'              => $validation['conflicts'] ?? [],
+            'address_updated'        => !empty($addressData),
+            'address_data'           => $addressData,
+            'partners_added'         => count($addedPartners),
+            'partners_added_names'   => $addedPartners,
+            'partners_out_of_range'  => $outOfRange,
+            'out_of_range_warning'   => count($outOfRange) > 0
+                ? count($outOfRange) . ' mitra dari pengajuan berada di luar radius 5km/30menit. Silakan tinjau kembali.'
+                : null,
+            'data' => $draft->fresh('partners'),
         ]);
     }
 
@@ -173,13 +251,58 @@ class MapController extends Controller
 
     private function resolvePartners(Request $request): array
     {
-        if ($request->has('partners')) {
-            return $request->input('partners');
-        }
+        if ($request->has('partners')) return $request->input('partners');
         if ($request->has('draft_id')) {
             $draft = SppgDraft::with('partners')->find($request->input('draft_id'));
             return $draft ? $draft->partners->toArray() : [];
         }
+        return [];
+    }
+
+    private function reverseGeocode(float $lat, float $lng): array
+    {
+        $url = "https://nominatim.openstreetmap.org/reverse?lat={$lat}&lon={$lng}&format=json&addressdetails=1&zoom=18";
+
+        try {
+            $res = Http::timeout(5)
+                ->withHeaders(['User-Agent' => 'COMS-MBG-SuperAdmin/1.0', 'Accept' => 'application/json'])
+                ->get($url);
+
+            if ($res->successful()) {
+                $data = $res->json();
+                $addr = $data['address'] ?? [];
+
+                $district = $addr['suburb']
+                    ?? $addr['village']
+                    ?? $addr['town']
+                    ?? $addr['city_district']
+                    ?? null;
+
+                $city = $addr['city']
+                    ?? $addr['regency']
+                    ?? $addr['county']
+                    ?? $addr['state_district']
+                    ?? null;
+
+                $addressParts = array_filter([
+                    $addr['road']   ?? null,
+                    $addr['house_number'] ?? null,
+                    $addr['suburb'] ?? null,
+                    $city,
+                ]);
+
+                return [
+                    'address'  => implode(', ', $addressParts) ?: ($data['display_name'] ?? null),
+                    'district' => $district,
+                    'city'     => $city,
+                    'province' => $addr['state'] ?? null,
+                    'raw'      => $data['display_name'] ?? null,
+                ];
+            }
+        } catch (\Exception $e) {
+            Log::warning('Reverse geocode error: ' . $e->getMessage());
+        }
+
         return [];
     }
 
@@ -210,6 +333,7 @@ class MapController extends Controller
     {
         return SppgDraft::whereNotNull('latitude')
             ->whereNotNull('longitude')
+            ->where('status', 'draft')
             ->with(['partners' => fn($q) => $q->select('id', 'draft_id', 'school_name', 'latitude', 'longitude', 'jumlah_porsi', 'data_source')])
             ->get()
             ->map(fn($d) => [

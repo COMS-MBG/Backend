@@ -41,7 +41,6 @@ return new class extends Migration
                 try { $table->dropIndex(['ownership_status']); } catch (\Exception $e) {}
                 try { $table->dropIndex(['district']); } catch (\Exception $e) {}
                 try { $table->dropIndex(['city']); } catch (\Exception $e) {}
-
                 $table->renameColumn('school_name',      'nama_sekolah');
                 $table->renameColumn('school_type',      'bentuk');
                 $table->renameColumn('ownership_status', 'status');

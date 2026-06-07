@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\API\SppgDraftController;
 use App\Http\Controllers\API\SuperAdmin\EmployeeController;
 use App\Http\Controllers\API\SuperAdmin\SchoolController;
 use App\Http\Controllers\API\SuperAdmin\SPPGController;
@@ -67,17 +68,36 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])
 
     // ── GIS Maps & Analytics ───────────────────────────────────────────────────
     Route::prefix('map')->group(function () {
-    Route::get('/data',                                   [MapController::class, 'getMapData']);
-    Route::post('/geocode',                               [MapController::class, 'geocode']);
-    Route::post('/route-check',                           [MapController::class, 'routeCheck']);
-    Route::post('/validate-point',                        [MapController::class, 'validatePoint']);
-    Route::post('/suggest-shift',                         [MapController::class, 'suggestShift']);
-    Route::post('/confirm-point/{submission_id}',         [MapController::class, 'confirmPoint']);
-});
+        Route::get('/data',                                   [MapController::class, 'getMapData']);
+        Route::post('/geocode',                               [MapController::class, 'geocode']);
+        Route::post('/route-check',                           [MapController::class, 'routeCheck']);
+        Route::post('/validate-point',                        [MapController::class, 'validatePoint']);
+        Route::post('/suggest-shift',                         [MapController::class, 'suggestShift']);
+        Route::post('/confirm-point/{submission_id}',         [MapController::class, 'confirmPoint']);
+    });
 
     // ── Schools ────────────────────────────────────────────────────────────────
     Route::apiResource('schools', SchoolController::class);
 
     // ── Financial Reports ──────────────────────────────────────────────────────
     Route::apiResource('financial-reports', FinancialReportController::class);
+
 });
+
+// ─── SPPG Pengajuan (Draft) - User Routes ──────────────────────────────────────
+// Prefix: /api/sppg-drafts
+// Middleware: auth:sanctum (user yang sudah login, tidak perlu super_admin)
+Route::middleware('auth:sanctum')
+    ->prefix('sppg-drafts')
+    ->group(function () {
+        // Buat draft + form1
+        Route::post('/', [SppgDraftController::class, 'storeForm1']);
+        
+        // Lihat detail draft
+        Route::get('{draftId}', [SppgDraftController::class, 'show']);
+        
+        // Kelola mitra
+        Route::post('{draftId}/partners', [SppgDraftController::class, 'addPartner']);
+        Route::put('{draftId}/partners/{partnerId}', [SppgDraftController::class, 'updatePartner']);
+        Route::delete('{draftId}/partners/{partnerId}', [SppgDraftController::class, 'deletePartner']);
+    });
