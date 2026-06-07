@@ -14,6 +14,7 @@ class UpdateSchoolRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'npsn'          => 'nullable|string|max:50|unique:schools,npsn,' . $this->route('school'),
             'name'          => 'sometimes|string|max:255',
             'address'       => 'sometimes|string',
             'latitude'      => 'nullable|numeric|between:-90,90',

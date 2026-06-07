@@ -14,6 +14,7 @@ class StoreSchoolRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'npsn'          => 'nullable|string|max:50|unique:schools,npsn',
             'name'          => 'required|string|max:255',
             'address'       => 'required|string',
             'latitude'      => 'required|numeric|between:-90,90',

@@ -27,6 +27,7 @@ class SchoolController extends Controller
             'meta'    => [
                 'current_page' => $schools->currentPage(),
                 'last_page'    => $schools->lastPage(),
+                'per_page'     => $schools->perPage(),
                 'total'        => $schools->total(),
             ],
         ]);
