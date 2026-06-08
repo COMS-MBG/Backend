@@ -20,6 +20,7 @@ class MenuItem extends Model
         'recipe_id',
         'day_of_week',
         'menu_date',
+        'meal_time',
         'order',
     ];
 

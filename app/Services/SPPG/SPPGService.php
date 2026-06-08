@@ -224,17 +224,54 @@ class SPPGService
                 ['sppg_id' => $sppg->id, 'school_id' => $school->id],
                 ['joined_at' => now(), 'status' => 'active']
             );
+
+            // Sync with partners table by NPSN
+            if ($school->npsn) {
+                Partner::where('npsn', $school->npsn)->update(['sppg_id' => $sppg->id]);
+            }
         });
     }
 
     public function detachSchool(string $sppgId, string $schoolId): void
     {
-        School::where('id', $schoolId)->where('sppg_id', $sppgId)
-              ->update(['sppg_id' => null]);
+        DB::transaction(function () use ($sppgId, $schoolId) {
+            // 1. If schoolId is a UUID, it is a Partner ID
+            if (\Illuminate\Support\Str::isUuid($schoolId)) {
+                $partner = Partner::where('id', $schoolId)->where('sppg_id', $sppgId)->first();
+                if ($partner) {
+                    $partner->update(['sppg_id' => null]);
 
-        \App\Models\SPPGSchool::where('sppg_id', $sppgId)
-            ->where('school_id', $schoolId)
-            ->update(['status' => 'inactive']);
+                    // Sync with schools table by NPSN
+                    if ($partner->npsn) {
+                        $school = School::where('npsn', $partner->npsn)->where('sppg_id', $sppgId)->first();
+                        if ($school) {
+                            $school->update(['sppg_id' => null]);
+
+                            \App\Models\SPPGSchool::where('sppg_id', $sppgId)
+                                ->where('school_id', $school->id)
+                                ->update(['status' => 'inactive']);
+                        }
+                    }
+                }
+            } else {
+                // 2. Otherwise it is a bigint School ID
+                $school = School::where('id', $schoolId)->where('sppg_id', $sppgId)->first();
+                if ($school) {
+                    $school->update(['sppg_id' => null]);
+
+                    \App\Models\SPPGSchool::where('sppg_id', $sppgId)
+                        ->where('school_id', $schoolId)
+                        ->update(['status' => 'inactive']);
+
+                    // Sync with partners table by NPSN
+                    if ($school->npsn) {
+                        Partner::where('npsn', $school->npsn)
+                            ->where('sppg_id', $sppgId)
+                            ->update(['sppg_id' => null]);
+                    }
+                }
+            }
+        });
     }
 
     public function getSummaryStats(): array

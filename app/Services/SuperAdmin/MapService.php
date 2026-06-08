@@ -35,6 +35,11 @@ class MapService
             return ['distance_km' => 0.0, 'duration_minutes' => 0.0];
         }
 
+        // Skip call if OSRM_BASE_URL points to dummy/refused port (e.g., 9999) to prevent slow connection timeouts
+        if (str_contains($this->osrmBase, '9999')) {
+            return null;
+        }
+
         $url = "{$this->osrmBase}/route/v1/driving/{$lonA},{$latA};{$lonB},{$latB}?overview=false";
 
         try {

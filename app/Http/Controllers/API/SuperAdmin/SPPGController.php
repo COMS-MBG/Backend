@@ -172,7 +172,12 @@ class SPPGController extends Controller
 
         $data = $partners->map(function ($p) use ($sppg, $mapService) {
             $dist  = $mapService->calculateHaversineDistance($sppg->latitude, $sppg->longitude, $p->latitude, $p->longitude);
-            $route = $mapService->getRouteDurationAndDistance($sppg->latitude, $sppg->longitude, $p->latitude, $p->longitude);
+            
+            // Cache OSRM route calculations to prevent blocking single-threaded serve connection queues
+            $cacheKey = "route_" . md5("{$sppg->latitude}_{$sppg->longitude}_{$p->latitude}_{$p->longitude}");
+            $route = \Illuminate\Support\Facades\Cache::remember($cacheKey, now()->addDays(30), function () use ($mapService, $sppg, $p) {
+                return $mapService->getRouteDurationAndDistance($sppg->latitude, $sppg->longitude, $p->latitude, $p->longitude);
+            });
 
             return [
                 'id'                => $p->id,
@@ -224,7 +229,7 @@ class SPPGController extends Controller
 
     public function assignSchool(Request $request, string $sppgId): JsonResponse
     {
-        $request->validate(['school_id' => 'required|uuid|exists:schools,id']);
+        $request->validate(['school_id' => 'required|integer|exists:schools,id']);
         $this->sppgService->assignSchool($sppgId, $request->school_id);
 
         return response()->json([
