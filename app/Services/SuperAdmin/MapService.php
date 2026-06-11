@@ -35,14 +35,10 @@ class MapService
             return ['distance_km' => 0.0, 'duration_minutes' => 0.0];
         }
 
-<<<<<<< Updated upstream
         // Skip call if OSRM_BASE_URL points to dummy/refused port (e.g., 9999) to prevent slow connection timeouts
         if (str_contains($this->osrmBase, '9999')) {
             return null;
         }
-
-=======
->>>>>>> Stashed changes
         $url = "{$this->osrmBase}/route/v1/driving/{$lonA},{$latA};{$lonB},{$latB}?overview=false";
 
         try {
@@ -80,7 +76,6 @@ class MapService
         return $route ? $route['duration_minutes'] : 999.0;
     }
 
-<<<<<<< Updated upstream
     // ─── Estimasi durasi dari jarak Haversine ────────────────────────────────────
     private function estimateDurationFromHaversine(float $distKm): float
     {
@@ -105,19 +100,17 @@ class MapService
             $distKm = $this->calculateHaversineDistance($lat, $lng, $sppg->latitude, $sppg->longitude);
             if ($distKm <= 5.0) {
                 $overcapacity = $sppg->partners_count >= ($sppg->capacity ?? 9999);
-=======
     // ─── Validasi titik pengajuan ────────────────────────────────────────────────
-    public function validatePoint(float $lat, float $lng, array $draftPartners): array
-    {
-        $status    = 'green';
-        $conflicts = [];
+    // public function validatePoint(float $lat, float $lng, array $draftPartners): array
+    // {
+    //     $status    = 'green';
+    //     $conflicts = [];
 
-        // 1. Cek overlap centroid ke SPPG aktif (pakai jarak jalan)
-        foreach (SPPG::where('status', 'active')->get() as $sppg) {
-            $distKm = $this->getRoadDistanceKm($lat, $lng, $sppg->latitude, $sppg->longitude);
-            if ($distKm <= 5.0) {
-                $overcapacity = $sppg->partners()->count() >= ($sppg->capacity ?? 9999);
->>>>>>> Stashed changes
+    //     // 1. Cek overlap centroid ke SPPG aktif (pakai jarak jalan)
+    //     foreach (SPPG::where('status', 'active')->get() as $sppg) {
+    //         $distKm = $this->getRoadDistanceKm($lat, $lng, $sppg->latitude, $sppg->longitude);
+    //         if ($distKm <= 5.0) {
+    //             $overcapacity = $sppg->partners()->count() >= ($sppg->capacity ?? 9999);
                 if ($overcapacity) {
                     if ($status !== 'red') $status = 'yellow';
                     $conflicts[] = "Overlap {$distKm}km dengan SPPG {$sppg->name} (overcapacity).";
@@ -128,11 +121,7 @@ class MapService
             }
         }
 
-<<<<<<< Updated upstream
         // 2. Cek takeover rule per mitra draft (pakai Haversine)
-=======
-        // 2. Cek takeover rule per mitra draft
->>>>>>> Stashed changes
         foreach ($draftPartners as $partner) {
             if (empty($partner['latitude']) || empty($partner['longitude'])) continue;
 
@@ -150,23 +139,17 @@ class MapService
 
             if ($existing?->sppg) {
                 $existSppg   = $existing->sppg;
-<<<<<<< Updated upstream
                 $distExist   = $this->calculateHaversineDistance($existSppg->latitude, $existSppg->longitude, $existing->latitude, $existing->longitude);
                 $durExist    = $this->estimateDurationFromHaversine($distExist);
-=======
-                $distExist   = $this->getRoadDistanceKm($existSppg->latitude, $existSppg->longitude, $existing->latitude, $existing->longitude);
-                $durExist    = $this->getRoadDurationMin($existSppg->latitude, $existSppg->longitude, $existing->latitude, $existing->longitude);
->>>>>>> Stashed changes
+                // $distExist   = $this->getRoadDistanceKm($existSppg->latitude, $existSppg->longitude, $existing->latitude, $existing->longitude);
+                // $durExist    = $this->getRoadDurationMin($existSppg->latitude, $existSppg->longitude, $existing->latitude, $existing->longitude);
 
                 if ($distExist <= 5.0 && $durExist <= 30.0) {
                     $status      = 'red';
                     $conflicts[] = "Mitra {$partner['school_name']} tidak bisa di-takeover dari {$existSppg->name} ({$distExist}km, {$durExist}mnt).";
                 } else {
-<<<<<<< Updated upstream
                     $distNew = $this->calculateHaversineDistance($lat, $lng, $partner['latitude'], $partner['longitude']);
-=======
-                    $distNew = $this->getRoadDistanceKm($lat, $lng, $partner['latitude'], $partner['longitude']);
->>>>>>> Stashed changes
+                    //$distNew = $this->getRoadDistanceKm($lat, $lng, $partner['latitude'], $partner['longitude']);
                     if ($distNew < $distExist) {
                         if ($status !== 'red') $status = 'yellow';
                         $conflicts[] = "Mitra {$partner['school_name']} bisa di-takeover ({$distNew}km vs {$distExist}km dari {$existSppg->name}).";
@@ -175,10 +158,7 @@ class MapService
             }
         }
 
-<<<<<<< Updated upstream
         Log::info('[MapService] validatePoint completed', ['status' => $status, 'conflicts_count' => count($conflicts)]);
-=======
->>>>>>> Stashed changes
         return ['status' => $status, 'conflicts' => $conflicts];
     }
 
@@ -187,11 +167,8 @@ class MapService
     {
         $reachable = array_filter($draftPartners, function ($p) use ($lat, $lng) {
             if (empty($p['latitude']) || empty($p['longitude'])) return false;
-<<<<<<< Updated upstream
             return $this->calculateHaversineDistance($lat, $lng, $p['latitude'], $p['longitude']) <= 5.0;
-=======
-            return $this->getRoadDistanceKm($lat, $lng, $p['latitude'], $p['longitude']) <= 5.0;
->>>>>>> Stashed changes
+            //return $this->getRoadDistanceKm($lat, $lng, $p['latitude'], $p['longitude']) <= 5.0;
         });
 
         if (empty($reachable)) return null;
@@ -220,7 +197,6 @@ class MapService
     // Jika portion_count tidak tersedia, fallback ke jarak + durasi saja.
     public function recommendPartnersForPoint(float $lat, float $lng, int $capacity = 3000): array
     {
-<<<<<<< Updated upstream
         Log::info('[MapService] recommendPartnersForPoint started', compact('lat', 'lng', 'capacity'));
 
         $candidates = Partner::whereNull('sppg_id')
@@ -249,31 +225,29 @@ class MapService
                     'data_source'   => 'database',
                 ];
             })
-=======
-        $candidates = Partner::whereNull('sppg_id')
-            ->whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->get()
-            ->map(function ($p) use ($lat, $lng) {
-    $route = $this->getRouteDurationAndDistance($lat, $lng, $p->latitude, $p->longitude);
-    return [
-        'id'            => $p->id,
-        'school_name'   => $p->school_name,
-        'npsn'          => $p->npsn,
-        'level'         => $p->level         ?? null,
-        'school_status' => $p->school_status ?? null,
-        'address'       => $p->address       ?? null,
-        'latitude'      => $p->latitude,
-        'longitude'     => $p->longitude,
-        'district'      => $p->district,
-        'city'          => $p->city,
-        'portion_count' => $p->portion_count ?? 0,
-        'distance_km'   => $route ? $route['distance_km']     : $this->calculateHaversineDistance($lat, $lng, $p->latitude, $p->longitude),
-        'duration_min'  => $route ? $route['duration_minutes'] : 999.0,
-        'data_source'   => 'database',
-    ];
-})
->>>>>>> Stashed changes
+//         $candidates = Partner::whereNull('sppg_id')
+//             ->whereNotNull('latitude')
+//             ->whereNotNull('longitude')
+//             ->get()
+//             ->map(function ($p) use ($lat, $lng) {
+//     $route = $this->getRouteDurationAndDistance($lat, $lng, $p->latitude, $p->longitude);
+//     return [
+//         'id'            => $p->id,
+//         'school_name'   => $p->school_name,
+//         'npsn'          => $p->npsn,
+//         'level'         => $p->level         ?? null,
+//         'school_status' => $p->school_status ?? null,
+//         'address'       => $p->address       ?? null,
+//         'latitude'      => $p->latitude,
+//         'longitude'     => $p->longitude,
+//         'district'      => $p->district,
+//         'city'          => $p->city,
+//         'portion_count' => $p->portion_count ?? 0,
+//         'distance_km'   => $route ? $route['distance_km']     : $this->calculateHaversineDistance($lat, $lng, $p->latitude, $p->longitude),
+//         'duration_min'  => $route ? $route['duration_minutes'] : 999.0,
+//         'data_source'   => 'database',
+//     ];
+// })
             ->filter(fn($p) => $p['distance_km'] <= 5.0 && $p['duration_min'] <= 30.0)
             ->sortBy('distance_km')
             ->values();
@@ -293,17 +267,13 @@ class MapService
             if (!$hasPortions && count($selected) >= 4) break;
         }
 
-<<<<<<< Updated upstream
         Log::info('[MapService] recommendPartnersForPoint completed', ['candidates' => $candidates->count(), 'selected' => count($selected)]);
-=======
->>>>>>> Stashed changes
         return $selected;
     }
 
     // ─── K-Means rekomendasi pembangunan SPPG ───────────────────────────────────
     public function getKMeansRecommendations(): array
     {
-<<<<<<< Updated upstream
         Log::info('[MapService] KMeans recommendation generation started');
 
         $unserved = Partner::whereNull('sppg_id')
@@ -318,17 +288,15 @@ class MapService
             ->get()
             ->filter(fn($p) => $p->sppg &&
                 $this->calculateHaversineDistance($p->sppg->latitude, $p->sppg->longitude, $p->latitude, $p->longitude) > 5.0
-=======
-        $unserved = Partner::whereNull('sppg_id')
-            ->whereNotNull('latitude')->whereNotNull('longitude')->get();
+        // $unserved = Partner::whereNull('sppg_id')
+        //     ->whereNotNull('latitude')->whereNotNull('longitude')->get();
 
-        $takeover = Partner::whereNotNull('sppg_id')
-            ->whereNotNull('latitude')->whereNotNull('longitude')
-            ->with('sppg')
-            ->get()
-            ->filter(fn($p) => $p->sppg &&
-                $this->getRoadDistanceKm($p->sppg->latitude, $p->sppg->longitude, $p->latitude, $p->longitude) > 5.0
->>>>>>> Stashed changes
+        // $takeover = Partner::whereNotNull('sppg_id')
+        //     ->whereNotNull('latitude')->whereNotNull('longitude')
+        //     ->with('sppg')
+        //     ->get()
+        //     ->filter(fn($p) => $p->sppg &&
+        //         $this->getRoadDistanceKm($p->sppg->latitude, $p->sppg->longitude, $p->latitude, $p->longitude) > 5.0
             );
 
         $points = collect($unserved)->concat($takeover)->map(fn($p) => [
@@ -338,7 +306,6 @@ class MapService
             'longitude' => $p->longitude,
         ])->values()->all();
 
-<<<<<<< Updated upstream
         Log::info('[MapService] Schools loaded for KMeans', [
             'unserved' => $unserved->count(),
             'takeover' => $takeover->count(),
@@ -354,16 +321,14 @@ class MapService
             'longitude' => $p['longitude'],
         ])->values()->all();
 
-=======
-        if (empty($points)) return [];
+        // if (empty($points)) return [];
 
-        $k         = max(1, (int) floor(count($points) / 200));
-        $centroids = collect($points)->shuffle()->take($k)->map(fn($p) => [
-            'latitude'  => $p['latitude'],
-            'longitude' => $p['longitude'],
-        ])->values()->all();
+        // $k         = max(1, (int) floor(count($points) / 200));
+        // $centroids = collect($points)->shuffle()->take($k)->map(fn($p) => [
+        //     'latitude'  => $p['latitude'],
+        //     'longitude' => $p['longitude'],
+        // ])->values()->all();
 
->>>>>>> Stashed changes
         for ($iter = 0; $iter < 20; $iter++) {
             $clusters = array_fill(0, count($centroids), []);
             foreach ($points as $p) {
@@ -388,7 +353,6 @@ class MapService
             if (!$moved) break;
         }
 
-<<<<<<< Updated upstream
         // Hapus centroid kosong (cluster tanpa anggota)
         $centroids = array_values(array_filter($centroids, fn($c, $i) => !empty($clusters[$i]), ARRAY_FILTER_USE_BOTH));
 
@@ -402,31 +366,26 @@ class MapService
 
                 $durMin = $this->estimateDurationFromHaversine($distKm);
                 if ($durMin <= 30.0) {
-=======
-        $results = [];
-        foreach ($centroids as $c) {
-            // Gunakan Haversine untuk filter kasar, OSRM hanya untuk yang lolos
-            $nearby = array_filter($points, fn($p) =>
-                $this->calculateHaversineDistance($c['latitude'], $c['longitude'], $p['latitude'], $p['longitude']) <= 6.0
-            );
+        // $results = [];
+        // foreach ($centroids as $c) {
+        //     // Gunakan Haversine untuk filter kasar, OSRM hanya untuk yang lolos
+        //     $nearby = array_filter($points, fn($p) =>
+        //         $this->calculateHaversineDistance($c['latitude'], $c['longitude'], $p['latitude'], $p['longitude']) <= 6.0
+        //     );
 
-            $serving = [];
-            foreach ($nearby as $p) {
-                $route = $this->getRouteDurationAndDistance($c['latitude'], $c['longitude'], $p['latitude'], $p['longitude']);
-                $distKm = $route ? $route['distance_km']     : $this->calculateHaversineDistance($c['latitude'], $c['longitude'], $p['latitude'], $p['longitude']);
-                $durMin = $route ? $route['duration_minutes'] : 999.0;
-                if ($distKm <= 5.0 && $durMin <= 30.0) {
->>>>>>> Stashed changes
+        //     $serving = [];
+        //     foreach ($nearby as $p) {
+        //         $route = $this->getRouteDurationAndDistance($c['latitude'], $c['longitude'], $p['latitude'], $p['longitude']);
+        //         $distKm = $route ? $route['distance_km']     : $this->calculateHaversineDistance($c['latitude'], $c['longitude'], $p['latitude'], $p['longitude']);
+        //         $durMin = $route ? $route['duration_minutes'] : 999.0;
+        //         if ($distKm <= 5.0 && $durMin <= 30.0) {
                     $serving[] = array_merge($p, ['distance_km' => $distKm, 'duration_min' => $durMin]);
                 }
             }
 
-<<<<<<< Updated upstream
             // Minimal 2 sekolah untuk menghasilkan rekomendasi
             if (count($serving) >= 2) {
-=======
-            if (count($serving) >= 3) {
->>>>>>> Stashed changes
+            //if (count($serving) >= 3) {
                 $results[] = [
                     'latitude'     => round($c['latitude'], 8),
                     'longitude'    => round($c['longitude'], 8),
@@ -436,32 +395,23 @@ class MapService
             }
         }
 
-<<<<<<< Updated upstream
         Log::info('[MapService] KMeans recommendations generated', ['count' => count($results)]);
-=======
->>>>>>> Stashed changes
         return $results;
     }
 
     // ─── Helper: semua data sekolah/mitra untuk layer peta ──────────────────────
     public function getSchoolsLayerData(): array
     {
-<<<<<<< Updated upstream
         Log::info('[MapService] getSchoolsLayerData started');
 
-=======
->>>>>>> Stashed changes
         $activeSppgs = SPPG::where('status', 'active')
             ->select('id', 'name', 'latitude', 'longitude', 'capacity')
             ->withCount('partners')
             ->get()
             ->keyBy('id');
 
-<<<<<<< Updated upstream
         $schools = Partner::select('id','school_name','npsn','school_type','ownership_status',
-=======
-        return Partner::select('id','school_name','npsn','school_type','ownership_status',
->>>>>>> Stashed changes
+        //return Partner::select('id','school_name','npsn','school_type','ownership_status',
                 'district','city','latitude','longitude','portion_count','sppg_id')
             ->get()
             ->map(function ($p) use ($activeSppgs) {
@@ -471,15 +421,10 @@ class MapService
 
                 if ($p->sppg_id && $activeSppgs->has($p->sppg_id)) {
                     $sppg   = $activeSppgs->get($p->sppg_id);
-<<<<<<< Updated upstream
                     $distKm = $this->calculateHaversineDistance($p->latitude, $p->longitude, $sppg->latitude, $sppg->longitude);
 
                     // Kuning jika jarak Haversine > 5km (takeover candidate)
-=======
-                    $distKm = $this->getRoadDistanceKm($p->latitude, $p->longitude, $sppg->latitude, $sppg->longitude);
-
-                    // Kuning jika jarak jalan > 5km (takeover candidate)
->>>>>>> Stashed changes
+                    //$distKm = $this->getRoadDistanceKm($p->latitude, $p->longitude, $sppg->latitude, $sppg->longitude);
                     $status   = $distKm <= 5.0 ? 'served' : 'takeover_candidate';
                     $sppgName = $sppg->name;
                 }
@@ -503,11 +448,7 @@ class MapService
             })
             ->values()
             ->all();
-<<<<<<< Updated upstream
-
         Log::info('[MapService] getSchoolsLayerData completed', ['count' => count($schools)]);
         return $schools;
-=======
->>>>>>> Stashed changes
     }
 }
