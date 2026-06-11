@@ -21,13 +21,13 @@ class DeliveryScheduleSeeder extends Seeder
         $adminLogistik = User::where('email', 'adit@sppg.test')->first();
         $adminSppg     = User::where('email', 'naufal@sppg.test')->first();
         
-        $courierAsep    = Employee::where('position', 'kurir')->where('name', 'like', '%Asep%')->first();
-        $courierBambang = Employee::where('position', 'kurir')->where('name', 'like', '%Bambang%')->first();
+        $courierAsep    = Employee::where('position', 'courier')->where('name', 'like', '%Asep%')->first();
+        $courierBambang = Employee::where('position', 'courier')->where('name', 'like', '%Bambang%')->first();
 
         $schools = School::whereNotNull('sppg_id')->get();
 
         if (!$adminLogistik || !$courierAsep || $schools->isEmpty()) {
-            $this->command->error('Gagal menjalankan DeliveryScheduleSeeder: Ketergantungan data (admin logistik, kurir, sekolah ter-assign) tidak ditemukan. Pastikan UserSeeder dan SchoolSeeder sudah dijalankan.');
+            $this->command->error('DeliveryScheduleSeeder failed: Missing dependencies (logistics admin, courier, or assigned schools). Run UserSeeder and SchoolSeeder first.');
             return;
         }
 
@@ -160,9 +160,15 @@ class DeliveryScheduleSeeder extends Seeder
             'delivery_schedule_id' => $confirmedSchedule->id,
             'courier_id'           => $confirmedSchedule->courier_id,
             'school_id'            => $confirmedSchedule->school_id,
+<<<<<<< Updated upstream
             'courier_name'         => $confirmedSchedule->courier->name ?? 'Asep Kurir',
             'school_name'          => $confirmedSchedule->school->name ?? 'Sekolah Mitra',
             'school_address'       => $confirmedSchedule->school->address ?? 'Alamat Sekolah',
+=======
+            'courier_name'         => $confirmedSchedule->courier->name ?? 'Courier',
+            'school_name'          => $confirmedSchedule->school->name ?? 'Partner School',
+            'school_address'       => $confirmedSchedule->school->address ?? 'School Address',
+>>>>>>> Stashed changes
             'vehicle_type'         => $confirmedSchedule->vehicle_type,
             'vehicle_plate'        => $confirmedSchedule->vehicle_plate,
             'departed_at'          => $confirmedSchedule->departed_at,
@@ -175,6 +181,6 @@ class DeliveryScheduleSeeder extends Seeder
             'notes'                => $confirmedSchedule->confirmation_notes,
         ]);
 
-        $this->command->info('DeliverySchedules & DeliveryHistories seed selesai.');
+        $this->command->info('DeliverySchedules & DeliveryHistories seeded successfully.');
     }
 }

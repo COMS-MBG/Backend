@@ -68,6 +68,7 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])
 
     // ── GIS Maps & Analytics ───────────────────────────────────────────────────
     Route::prefix('map')->group(function () {
+<<<<<<< Updated upstream
         Route::get('/data',                                   [MapController::class, 'getMapData']);
         Route::post('/geocode',                               [MapController::class, 'geocode']);
         Route::post('/route-check',                           [MapController::class, 'routeCheck']);
@@ -75,6 +76,15 @@ Route::middleware(['auth:sanctum', 'role:super_admin'])
         Route::post('/suggest-shift',                         [MapController::class, 'suggestShift']);
         Route::post('/confirm-point/{submission_id}',         [MapController::class, 'confirmPoint']);
     });
+=======
+    Route::get('/data',                                   [MapController::class, 'getMapData']);
+    Route::post('/geocode',                               [MapController::class, 'geocode']);
+    Route::post('/route-check',                           [MapController::class, 'routeCheck']);
+    Route::post('/validate-point',                        [MapController::class, 'validatePoint']);
+    Route::post('/suggest-shift',                         [MapController::class, 'suggestShift']);
+    Route::post('/confirm-point/{submission_id}',         [MapController::class, 'confirmPoint']);
+});
+>>>>>>> Stashed changes
 
     // ── Schools ────────────────────────────────────────────────────────────────
     Route::apiResource('schools', SchoolController::class);

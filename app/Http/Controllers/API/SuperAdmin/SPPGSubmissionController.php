@@ -211,6 +211,31 @@ class SppgSubmissionController extends Controller
             ], 422);
         }
 
+        // ── Guard 5: Cek duplikasi email admin/karyawan di tabel users ────────
+        $emailsToCheck = [];
+        if (!empty($draft->form2_data['email'])) {
+            $emailsToCheck['Admin SPPG'] = trim($draft->form2_data['email']);
+        }
+        
+        $nutri = $draft->form3_data['nutritionist'] ?? $draft->form3_data['ahli_gizi'] ?? null;
+        if (!empty($nutri['email'])) {
+            $emailsToCheck['Ahli Gizi'] = trim($nutri['email']);
+        }
+        
+        $logis = $draft->form3_data['logistics_admin'] ?? $draft->form3_data['admin_logistik'] ?? null;
+        if (!empty($logis['email'])) {
+            $emailsToCheck['Admin Logistik'] = trim($logis['email']);
+        }
+
+        foreach ($emailsToCheck as $role => $email) {
+            if (\App\Models\User::where('email', $email)->exists()) {
+                return response()->json([
+                    'success' => false,
+                    'message' => "Email untuk {$role} ('{$email}') sudah terdaftar dalam sistem. Silakan gunakan email lain.",
+                ], 422);
+            }
+        }
+
         // ── STEP 1: Auto-geocode mitra yang belum punya koordinat ────────────
         foreach ($draft->partners as $partner) {
             if (!empty($partner->latitude) && !empty($partner->longitude)) {
@@ -263,7 +288,10 @@ class SppgSubmissionController extends Controller
         // ── STEP 3: Daftar SPPG (dalam transaction) ────────────────────────
         $sppg = DB::transaction(function () use ($draft, $registrationService) {
             $registrationData = [
-                'sppg'            => $draft->form1_data,
+                'sppg'            => array_merge($draft->form1_data ?? [], [
+                    'latitude'  => $draft->confirmed_latitude ?? $draft->latitude,
+                    'longitude' => $draft->confirmed_longitude ?? $draft->longitude,
+                ]),
                 'admin_sppg'      => $draft->form2_data,
                 'nutritionist'    => $draft->form3_data['nutritionist'] ?? $draft->form3_data['ahli_gizi'] ?? null,
                 'logistics_admin' => $draft->form3_data['logistics_admin'] ?? $draft->form3_data['admin_logistik'] ?? null,

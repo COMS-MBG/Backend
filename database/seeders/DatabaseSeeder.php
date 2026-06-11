@@ -41,7 +41,10 @@ class DatabaseSeeder extends Seeder
             RatingSeeder::class,
             RecommendationSeeder::class,
             SPPGSubmissionSeeder::class,
+<<<<<<< Updated upstream
             
+=======
+>>>>>>> Stashed changes
         ]);
     }
 }

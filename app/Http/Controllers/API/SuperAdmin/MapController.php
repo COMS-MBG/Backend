@@ -15,6 +15,10 @@ use Illuminate\Support\Facades\Log;
 class MapController extends Controller
 {
     // ─── GET /api/super-admin/map/data ──────────────────────────────────────────
+<<<<<<< Updated upstream
+=======
+    // Satu-satunya endpoint yang perlu dipanggil FE untuk render peta lengkap.
+>>>>>>> Stashed changes
     public function getMapData(Request $request, MapService $mapService): JsonResponse
     {
         return response()->json([
@@ -51,7 +55,11 @@ class MapController extends Controller
         return response()->json(['success' => false, 'message' => 'Geocoding gagal.'], 500);
     }
 
+<<<<<<< Updated upstream
     // ─── POST /api/super-admin/map/route-check ──────────────────────────────
+=======
+    // ─── POST /api/super-admin/map/route-check ──────────────────────────────────
+>>>>>>> Stashed changes
     public function routeCheck(Request $request, MapService $mapService): JsonResponse
     {
         $request->validate([
@@ -104,6 +112,7 @@ class MapController extends Controller
     }
 
     // ─── POST /api/super-admin/map/confirm-point/{submission_id} ────────────────
+<<<<<<< Updated upstream
     /**
      * FLOW LENGKAP:
      * 1. Reverse geocode → update alamat SPPG
@@ -112,6 +121,9 @@ class MapController extends Controller
      * 4. Tambahkan rekomendasi (merge, skip duplikat)
      * 5. Simpan semuanya ke draft
      */
+=======
+    // Simpan koordinat yang dikonfirmasi + rekomendasi mitra ke draft.
+>>>>>>> Stashed changes
     public function confirmPoint(Request $request, string $submissionId, MapService $mapService): JsonResponse
     {
         $request->validate([
@@ -120,6 +132,7 @@ class MapController extends Controller
             'capacity'  => 'nullable|integer|min:1',
         ]);
 
+<<<<<<< Updated upstream
         $draft        = SppgDraft::with('partners')->findOrFail($submissionId);
         $confirmedLat = (float) $request->latitude;
         $confirmedLng = (float) $request->longitude;
@@ -143,11 +156,23 @@ class MapController extends Controller
         if (!empty($addressData['province'])) $form1['province'] = $addressData['province'];
 
         // ── 4. Simpan koordinat + status + form1 ke draft ───────────────────
+=======
+        $draft       = SppgDraft::with('partners')->findOrFail($submissionId);
+        $confirmedLat = (float) $request->latitude;
+        $confirmedLng = (float) $request->longitude;
+        $capacity     = (int)   ($request->capacity ?? 3000);
+
+        // Validasi status titik
+        $validation = $mapService->validatePoint($confirmedLat, $confirmedLng, $draft->partners->toArray());
+
+        // Simpan koordinat + status ke draft
+>>>>>>> Stashed changes
         $draft->update([
             'confirmed_latitude'  => $confirmedLat,
             'confirmed_longitude' => $confirmedLng,
             'point_status'        => $validation['status'],
             'map_confirmed'       => true,
+<<<<<<< Updated upstream
             'form1_data'          => $form1,
         ]);
 
@@ -244,6 +269,47 @@ class MapController extends Controller
                 ? count($outOfRange) . ' mitra dari pengajuan berada di luar radius 5km/30menit. Silakan tinjau kembali.'
                 : null,
             'data' => $draft->fresh('partners'),
+=======
+        ]);
+
+        // Update lat/lng di form1_data juga agar pengajuan membawa koordinat terkonfirmasi
+        $form1 = $draft->form1_data ?? [];
+        $form1['latitude']  = $confirmedLat;
+        $form1['longitude'] = $confirmedLng;
+        $draft->update(['form1_data' => $form1]);
+
+        // Rekomendasi mitra dari sistem berdasarkan titik terkonfirmasi
+        $recommendedPartners = $mapService->recommendPartnersForPoint($confirmedLat, $confirmedLng, $capacity);
+
+        // Tandai mitra rekomendasi yg belum ada di draft, tambahkan sebagai draft partner
+        $existingNpsns = $draft->partners->pluck('npsn')->filter()->toArray();
+
+        foreach ($recommendedPartners as $rp) {
+    if (!empty($rp['npsn']) && in_array($rp['npsn'], $existingNpsns)) continue;
+
+    SppgDraftPartner::create([
+        'draft_id'     => $draft->id,
+        'school_name'  => $rp['school_name'],
+        'npsn'         => $rp['npsn']     ?? null,
+        'level'        => $rp['level']    ?? 'SMA',      // fallback, Admin SPPG lengkapi nanti
+        'school_status'=> $rp['school_status'] ?? 'negeri', // fallback
+        'address'      => $rp['address']  ?? $rp['district'] . ', ' . $rp['city'],
+        'city'         => $rp['city']     ?? '',
+        'district'     => $rp['district'] ?? '',
+        'latitude'     => $rp['latitude'],
+        'longitude'    => $rp['longitude'],
+        'jumlah_porsi' => $rp['portion_count'] ?? 0,
+        'data_source'  => 'database',  // bukan system_recommendation
+    ]);
+}
+
+        return response()->json([
+            'success'     => true,
+            'message'     => 'Titik dikonfirmasi. Rekomendasi mitra telah ditambahkan ke draft.',
+            'point_status'=> $validation['status'],
+            'conflicts'   => $validation['conflicts'],
+            'data'        => $draft->fresh('partners'),
+>>>>>>> Stashed changes
         ]);
     }
 
@@ -251,7 +317,13 @@ class MapController extends Controller
 
     private function resolvePartners(Request $request): array
     {
+<<<<<<< Updated upstream
         if ($request->has('partners')) return $request->input('partners');
+=======
+        if ($request->has('partners')) {
+            return $request->input('partners');
+        }
+>>>>>>> Stashed changes
         if ($request->has('draft_id')) {
             $draft = SppgDraft::with('partners')->find($request->input('draft_id'));
             return $draft ? $draft->partners->toArray() : [];
@@ -259,6 +331,7 @@ class MapController extends Controller
         return [];
     }
 
+<<<<<<< Updated upstream
     private function reverseGeocode(float $lat, float $lng): array
     {
         $url = "https://nominatim.openstreetmap.org/reverse?lat={$lat}&lon={$lng}&format=json&addressdetails=1&zoom=18";
@@ -306,6 +379,8 @@ class MapController extends Controller
         return [];
     }
 
+=======
+>>>>>>> Stashed changes
     private function buildSppgLayers(): array
     {
         return SPPG::where('status', 'active')
@@ -333,7 +408,10 @@ class MapController extends Controller
     {
         return SppgDraft::whereNotNull('latitude')
             ->whereNotNull('longitude')
+<<<<<<< Updated upstream
             ->where('status', 'draft')
+=======
+>>>>>>> Stashed changes
             ->with(['partners' => fn($q) => $q->select('id', 'draft_id', 'school_name', 'latitude', 'longitude', 'jumlah_porsi', 'data_source')])
             ->get()
             ->map(fn($d) => [
