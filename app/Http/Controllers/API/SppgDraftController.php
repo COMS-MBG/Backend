@@ -1,7 +1,7 @@
 <?php
 
 namespace App\Http\Controllers\API;
-
+use App\Http\Controllers\Controller;
 use App\Models\SppgDraft;
 use App\Models\SppgDraftPartner;
 use App\Services\AddressValidationService;
