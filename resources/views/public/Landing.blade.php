@@ -12,6 +12,8 @@
     <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css" rel="stylesheet">
     {{-- Google Fonts --}}
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    {{-- Leaflet CSS --}}
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
 
     <style>
         :root {
@@ -97,16 +99,15 @@
 
         .map-wrapper {
             position: relative;
-            display: inline-block;
             width: 100%;
         }
 
-        .map-img {
+        #public-map {
             width: 100%;
-            height: 420px;
-            object-fit: cover;
+            height: 440px;
             border-radius: 1.25rem;
             box-shadow: 0 10px 40px rgba(0,0,0,.12);
+            z-index: 0;
         }
 
         .floating-status-card {
@@ -118,6 +119,32 @@
             padding: 1rem 1.25rem;
             min-width: 220px;
             box-shadow: 0 8px 24px rgba(0,0,0,.12);
+            z-index: 999;
+        }
+
+        /* Legend badge di pojok kanan atas peta */
+        .map-legend {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: #fff;
+            border-radius: 0.75rem;
+            padding: 0.6rem 0.9rem;
+            font-size: 0.75rem;
+            box-shadow: 0 4px 16px rgba(0,0,0,.10);
+            z-index: 999;
+            display: flex;
+            flex-direction: column;
+            gap: 0.35rem;
+        }
+
+        .legend-dot {
+            display: inline-block;
+            width: 11px;
+            height: 11px;
+            border-radius: 50%;
+            margin-right: 6px;
+            flex-shrink: 0;
         }
 
         .floating-status-card .stat-number {
@@ -507,27 +534,34 @@
 
             {{-- Map Wrapper --}}
             <div class="map-wrapper">
-                <img
-                    src="https://maps.googleapis.com/maps/api/staticmap?center=Bandung,Indonesia&zoom=13&size=1200x420&maptype=roadmap&style=feature:all|element:geometry|color:0xf5f5f5&style=feature:road|color:0xffffff&key=AIzaSyD-9tSrke72PouQMnMX-a7eZSW0jkFMBWY"
-                    onerror="this.src='https://tile.openstreetmap.org/12/3293/2040.png'"
-                    alt="Peta Operasional Sumur Bandung"
-                    class="map-img img-fluid"
-                    id="peta-operasional-img"
-                >
+                {{-- Leaflet Map --}}
+                <div id="public-map" aria-label="Peta Sebaran SPPG Terdaftar"></div>
+
+                {{-- Legend --}}
+                <div class="map-legend" id="map-legend" aria-label="Keterangan peta">
+                    <div class="d-flex align-items-center">
+                        <span class="legend-dot" style="background:#22c55e;"></span>
+                        <span class="text-dark fw-semibold">Sekolah Terdaftar</span>
+                    </div>
+                    <div class="d-flex align-items-center">
+                        <span class="legend-dot" style="background:#3b82f6;"></span>
+                        <span class="text-dark fw-semibold">Rekomendasi SPPG</span>
+                    </div>
+                </div>
 
                 {{-- Floating Status Card --}}
                 <div class="floating-status-card" id="floating-status-card">
                     <p class="text-muted mb-1" style="font-size: 0.65rem; font-weight: 700; text-transform: uppercase; letter-spacing: 1px;">
                         Status Operasional
                     </p>
-                    <div class="stat-number">25</div>
-                    <p class="text-muted mt-1 mb-2" style="font-size: 0.75rem;">Sekolah Terlayani (Real-time)</p>
-                    <div class="progress" style="height: 6px; border-radius: 99px;" role="progressbar" aria-label="Persentase sekolah terlayani" aria-valuenow="65" aria-valuemin="0" aria-valuemax="100">
-                        <div class="progress-bar bg-success" style="width: 65%; border-radius: 99px;"></div>
+                    <div class="stat-number" id="map-served-count">—</div>
+                    <p class="text-muted mt-1 mb-2" style="font-size: 0.75rem;">Sekolah Terlayani (Terdaftar)</p>
+                    <div class="progress" style="height: 6px; border-radius: 99px;" role="progressbar" id="map-progress-bar" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100">
+                        <div class="progress-bar bg-success" id="map-progress-fill" style="width: 0%; border-radius: 99px;"></div>
                     </div>
                     <div class="d-flex justify-content-between mt-1">
                         <small class="text-muted" style="font-size:0.7rem;">0%</small>
-                        <small class="text-success fw-semibold" style="font-size:0.7rem;">65%</small>
+                        <small class="text-success fw-semibold" id="map-pct" style="font-size:0.7rem;">0%</small>
                     </div>
                 </div>
             </div>
@@ -683,9 +717,11 @@
 
     {{-- Bootstrap 5 JS --}}
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+    {{-- Leaflet JS --}}
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 
     <script>
-        // Smooth scroll untuk anchor link
+        // ── Smooth scroll ──────────────────────────────────────────────────────────
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
                 const target = document.querySelector(this.getAttribute('href'));
@@ -696,15 +732,108 @@
             });
         });
 
-        // Navbar shadow saat scroll
+        // ── Navbar shadow saat scroll ──────────────────────────────────────────────
         const navbar = document.getElementById('mainNavbar');
         window.addEventListener('scroll', () => {
-            if (window.scrollY > 20) {
-                navbar.style.boxShadow = '0 4px 20px rgba(0,0,0,.10)';
-            } else {
-                navbar.style.boxShadow = '0 2px 12px rgba(0,0,0,.05)';
-            }
+            navbar.style.boxShadow = window.scrollY > 20
+                ? '0 4px 20px rgba(0,0,0,.10)'
+                : '0 2px 12px rgba(0,0,0,.05)';
         });
+
+        // ── Leaflet Public Map ─────────────────────────────────────────────────────
+        (function initPublicMap() {
+            // Bandung center
+            const map = L.map('public-map', {
+                center: [-6.9175, 107.6191],
+                zoom: 13,
+                zoomControl: true,
+                scrollWheelZoom: false,
+            });
+
+            // Tile layer OpenStreetMap
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
+                maxZoom: 19,
+            }).addTo(map);
+
+            // Icon pabrik
+            const servedIcon = L.circleMarker.bind(null);
+
+            // ── 1. Load layer sekolah terdaftar ────────────────────────────────────
+            fetch('/api/public/maps/sppg')
+                .then(r => r.json())
+                .then(res => {
+                    if (!res.success) return;
+                    const schools = res.data;
+
+                    // Update floating card
+                    const total = schools.length;
+                    document.getElementById('map-served-count').textContent = total;
+
+                    // Hitung persentase vs seluruh Partner (pakai nilai dari recommendations nanti)
+                    // Untuk sementara set 100% karena kita hanya tampilkan yg served
+                    const pct = 100;
+                    document.getElementById('map-progress-fill').style.width = pct + '%';
+                    document.getElementById('map-progress-bar').setAttribute('aria-valuenow', pct);
+                    document.getElementById('map-pct').textContent = total + ' Sekolah';
+
+                    schools.forEach(s => {
+                        if (!s.latitude || !s.longitude) return;
+                        L.circleMarker([s.latitude, s.longitude], {
+                            radius: 7,
+                            fillColor: '#22c55e',
+                            color: '#16a34a',
+                            weight: 1.5,
+                            opacity: 1,
+                            fillOpacity: 0.85,
+                        })
+                        .bindPopup(
+                            `<div style="font-family:Inter,sans-serif;min-width:180px;">
+                                <strong style="font-size:0.85rem;">${s.school_name}</strong><br>
+                                <small class="text-muted">${s.district ?? ''}, ${s.city ?? ''}</small><br>
+                                <span style="color:#22c55e;font-size:0.75rem;font-weight:600;">✔ Terdaftar — ${s.sppg_name ?? 'SPPG'}</span>
+                            </div>`
+                        )
+                        .addTo(map);
+                    });
+
+                    // Auto-fit jika ada data
+                    if (schools.length > 0) {
+                        const latlngs = schools
+                            .filter(s => s.latitude && s.longitude)
+                            .map(s => [s.latitude, s.longitude]);
+                        if (latlngs.length) map.fitBounds(latlngs, { padding: [40, 40] });
+                    }
+                })
+                .catch(err => console.warn('[PublicMap] schools layer error:', err));
+
+            // ── 2. Load layer rekomendasi K-Means ──────────────────────────────────
+            fetch('/api/public/maps/recommendations')
+                .then(r => r.json())
+                .then(res => {
+                    if (!res.success) return;
+                    res.data.forEach(pt => {
+                        if (!pt.latitude || !pt.longitude) return;
+                        L.circleMarker([pt.latitude, pt.longitude], {
+                            radius: 11,
+                            fillColor: '#3b82f6',
+                            color: '#1d4ed8',
+                            weight: 2,
+                            opacity: 0.9,
+                            fillOpacity: 0.5,
+                            dashArray: '4 3',
+                        })
+                        .bindPopup(
+                            `<div style="font-family:Inter,sans-serif;min-width:160px;">
+                                <strong style="font-size:0.85rem;">📍 Rekomendasi SPPG</strong><br>
+                                <small>${pt.school_count} sekolah dalam radius 5 km</small>
+                            </div>`
+                        )
+                        .addTo(map);
+                    });
+                })
+                .catch(err => console.warn('[PublicMap] recommendations error:', err));
+        })();
     </script>
 </body>
 </html>

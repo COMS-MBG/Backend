@@ -42,6 +42,11 @@ Route::prefix('public')->group(function () {
         [PublicMapController::class, 'index']
     );
 
+    Route::get(
+        'maps/recommendations',
+        [PublicMapController::class, 'recommendations']
+    );
+
     Route::post(
         'feedback',
         [FeedbackController::class, 'store']
