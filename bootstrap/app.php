@@ -4,8 +4,7 @@ use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
 
-use Spatie\Permission\Middleware\RoleMiddleware;
-use Spatie\Permission\Middleware\PermissionMiddleware;
+
 
 return Application::configure(basePath: dirname(__DIR__))
     ->withRouting(
@@ -16,11 +15,18 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware) {
+        // Enable Sanctum's stateful middleware on API routes.
+        // This is CRITICAL for cookie/session auth on SPA requests.
+        // It adds: EncryptCookies, StartSession, VerifyCsrfToken, etc.
+        $middleware->statefulApi();
+
         $middleware->alias([
-            'role' => RoleMiddleware::class,
-            'permission' => PermissionMiddleware::class,
+            'role'=> \App\Http\Middleware\CheckRole::class,
+            'permission'=> \App\Http\Middleware\CheckPermission::class,
+            'scope.sppg'=> \App\Http\Middleware\ScopeBySppg::class,
         ]);
     })
+
     ->withExceptions(function (Exceptions $exceptions): void {
         //
     })->create();

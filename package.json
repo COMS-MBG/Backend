@@ -16,6 +16,8 @@
         "vite": "^8.0.0"
     },
     "dependencies": {
+        "@scalar/api-reference": "^1.55.3",
+        "@scalar/sdk": "^0.1.5",
         "axios": "^1.15.2"
     }
 }
