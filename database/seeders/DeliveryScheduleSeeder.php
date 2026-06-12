@@ -160,15 +160,9 @@ class DeliveryScheduleSeeder extends Seeder
             'delivery_schedule_id' => $confirmedSchedule->id,
             'courier_id'           => $confirmedSchedule->courier_id,
             'school_id'            => $confirmedSchedule->school_id,
-<<<<<<< Updated upstream
-            'courier_name'         => $confirmedSchedule->courier->name ?? 'Asep Kurir',
-            'school_name'          => $confirmedSchedule->school->name ?? 'Sekolah Mitra',
-            'school_address'       => $confirmedSchedule->school->address ?? 'Alamat Sekolah',
-=======
             'courier_name'         => $confirmedSchedule->courier->name ?? 'Courier',
             'school_name'          => $confirmedSchedule->school->name ?? 'Partner School',
             'school_address'       => $confirmedSchedule->school->address ?? 'School Address',
->>>>>>> Stashed changes
             'vehicle_type'         => $confirmedSchedule->vehicle_type,
             'vehicle_plate'        => $confirmedSchedule->vehicle_plate,
             'departed_at'          => $confirmedSchedule->departed_at,
