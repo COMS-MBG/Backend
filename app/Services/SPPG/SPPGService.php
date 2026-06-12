@@ -241,7 +241,6 @@ class SPPGService
                 if ($partner) {
                     $partner->update(['sppg_id' => null]);
 
-<<<<<<< Updated upstream
                     // Sync with schools table by NPSN
                     if ($partner->npsn) {
                         $school = School::where('npsn', $partner->npsn)->where('sppg_id', $sppgId)->first();
@@ -273,11 +272,6 @@ class SPPGService
                 }
             }
         });
-=======
-        \App\Models\SPPGSchool::where('sppg_id', $sppgId)
-            ->where('school_id', $schoolId)
-            ->update(['status' => 'inactive']);
->>>>>>> Stashed changes
     }
 
     public function getSummaryStats(): array
