@@ -19,7 +19,8 @@ use App\Http\Controllers\API\AdminSPPG\RoleController;
 use App\Http\Controllers\API\AdminSPPG\PermissionController;
 use App\Http\Controllers\API\AdminSPPG\StockController;
 
-Route::middleware(['auth:sanctum'])
+// FIX: Tambahkan 'scope.sppg' di sini agar SEMUA route di dalam group ini terisolasi datanya
+Route::middleware(['auth:sanctum', 'scope.sppg'])
     ->prefix('admin-sppg')
     ->group(function () {
 
@@ -27,7 +28,7 @@ Route::middleware(['auth:sanctum'])
     Route::get('dashboard', [DashboardController::class, 'index'])
         ->middleware('permission:dashboard.read');
 
-    // ── Role Gate: Pemilik, Manajer, Admin SPPG ──────────────────────────────
+    // ── Role Gate: Pemilik, Admin SPPG (Manager dihapus dari RoleConstant) ────
     Route::middleware('role:' . RoleConstant::SPPG_MANAGEMENT_ROLES)->group(function () {
 
         // ── Employee Management ───────────────────────────────────────────
@@ -49,7 +50,6 @@ Route::middleware(['auth:sanctum'])
             ->middleware('permission:employee.update');
 
         // School Management
-        // FIX: tambah name prefix 'sppg.' agar tidak konflik dengan superadmin schools route
         Route::name('sppg.')->group(function () {
             Route::apiResource('schools', SchoolController::class);
             Route::apiResource('roles', RoleController::class);
@@ -57,7 +57,7 @@ Route::middleware(['auth:sanctum'])
         Route::get('permissions', [PermissionController::class, 'index']);
     });
 
-    // ── Partner Management (diluar role gate — akses dikontrol per-permission) ─
+    // ── Partner Management ────────────────────────────────────────────────────
     Route::get('partners/summary', [PartnerController::class, 'summary'])
         ->middleware('permission:partner.read');
     Route::post('partners/import', [PartnerController::class, 'import'])
@@ -73,6 +73,8 @@ Route::middleware(['auth:sanctum'])
     Route::delete('partners/{partner}', [PartnerController::class, 'destroy'])
         ->middleware('permission:partner.delete');
 
+    // ── Nutrition Management ──────────────────────────────────────────────────
+    // Middleware dihapus karena sudah di-handle di dalam Controller masing-masing
     Route::prefix('nutrition')->group(function () {
         // Ingredients
         Route::get('ingredients/dropdown', [IngredientController::class, 'dropdown']);

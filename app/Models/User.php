@@ -11,21 +11,13 @@ class User extends Authenticatable
 {
     use HasApiTokens, HasFactory, Notifiable;
 
-
     protected $fillable = [
-        'name',
-        'email',
-        'password',
-        'phone',
-        'profile_picture',
-        'is_active',
-        'role_type',
-        'sppg_id',
+        'name', 'email', 'password', 'phone', 'profile_picture',
+        'is_active', 'role_type', 'sppg_id',
     ];
 
     protected $hidden = [
-        'password',
-        'remember_token',
+        'password', 'remember_token',
     ];
 
     protected $casts = [
@@ -34,134 +26,72 @@ class User extends Authenticatable
         'password'          => 'hashed',
     ];
 
-    // ── Relationships ─────────────────────────────────────────────────────────
-
-    /**
-     * Employee record milik user ini.
-     * Nullable — tidak semua user punya employee record (misal: super_admin).
-     */
     public function employee(): \Illuminate\Database\Eloquent\Relations\HasOne
     {
         return $this->hasOne(Employee::class, 'user_id');
     }
 
-    /**
-     * SPPG yang diasosiasikan dengan user ini.
-     * Nullable — super_admin tidak terikat ke SPPG manapun.
-     */
     public function sppg(): \Illuminate\Database\Eloquent\Relations\BelongsTo
     {
         return $this->belongsTo(SPPG::class, 'sppg_id');
     }
 
-    // ── Helpers ───────────────────────────────────────────────────────────────
-
-    /**
-     * Cek apakah user adalah super admin.
-     * Super admin bypass semua RBAC tabel.
-     */
     public function isSuperAdmin(): bool
     {
         return $this->role_type === 'super_admin';
     }
 
-    /**
-     * Cek apakah user adalah sppg user.
-     */
     public function isSppgUser(): bool
     {
         return $this->role_type === 'sppg_user';
     }
 
-    /**
-     * Cek permission user via employee → role → permissions.
-     * Super admin bypass semua RBAC tabel.
-     * SPPG user dicek via employee → role → permissions.
-     *
-     * Contoh: $user->hasPermission('employee.create')
-     */
     public function hasPermission(string $permissionSlug): bool
     {
         if ($this->isSuperAdmin()) return true;
-
         return $this->employee?->hasPermission($permissionSlug) ?? false;
     }
 
-    /**
-     * Cek apakah user punya salah satu role yang diminta.
-     *
-     * Kompatibel dengan semua call-site yang sebelumnya pakai Spatie.
-     * Pengecekan:
-     *   1. role_type (super_admin)
-     *   2. employee → role → slug (admin_sppg, kurir, ahli_gizi, dll)
-     *
-     * Contoh: $user->hasAnyRole(['admin_logistik', 'super_admin'])
-     */
     public function hasAnyRole(array|string $roles): bool
     {
         $roles = (array) $roles;
-
-        // Cek role_type langsung (super_admin)
         if (in_array($this->role_type, $roles, true)) {
             return true;
         }
 
-        // Cek employee → role → slug
         $roleSlug = $this->employee?->role?->slug;
         if (!$roleSlug) {
             return false;
         }
 
-        // Normalisasi pengecekan role (Inggris <-> Indonesia)
         $normalizedRoles = [];
         foreach ($roles as $role) {
             $normalizedRoles[] = $role;
             if (in_array($role, ['courier', 'kurir'], true)) {
-                $normalizedRoles[] = 'courier';
-                $normalizedRoles[] = 'kurir';
+                array_push($normalizedRoles, 'courier', 'kurir');
             } elseif (in_array($role, ['logistics_admin', 'admin_logistik', 'admin-logistik'], true)) {
-                $normalizedRoles[] = 'logistics_admin';
-                $normalizedRoles[] = 'admin_logistik';
-                $normalizedRoles[] = 'admin-logistik';
+                array_push($normalizedRoles, 'logistics_admin', 'admin_logistik', 'admin-logistik');
             } elseif (in_array($role, ['sppg_admin', 'admin_sppg', 'admin-sppg'], true)) {
-                $normalizedRoles[] = 'sppg_admin';
-                $normalizedRoles[] = 'admin_sppg';
-                $normalizedRoles[] = 'admin-sppg';
+                array_push($normalizedRoles, 'sppg_admin', 'admin_sppg', 'admin-sppg');
             } elseif (in_array($role, ['nutritionist', 'ahli_gizi', 'ahli-gizi'], true)) {
-                $normalizedRoles[] = 'nutritionist';
-                $normalizedRoles[] = 'ahli_gizi';
-                $normalizedRoles[] = 'ahli-gizi';
+                array_push($normalizedRoles, 'nutritionist', 'ahli_gizi', 'ahli-gizi');
             } elseif (in_array($role, ['owner', 'pemilik'], true)) {
-                $normalizedRoles[] = 'owner';
-                $normalizedRoles[] = 'pemilik';
-            } elseif (in_array($role, ['manager', 'manajer'], true)) {
-                $normalizedRoles[] = 'manager';
-                $normalizedRoles[] = 'manajer';
+                array_push($normalizedRoles, 'owner', 'pemilik');
             }
         }
 
         return in_array($roleSlug, $normalizedRoles, true);
     }
 
-    /**
-     * Pastikan user hanya bisa akses SPPG miliknya.
-     * Super admin bisa akses semua SPPG.
-     */
     public function ownsSppg(int $sppgId): bool
     {
         if ($this->isSuperAdmin()) return true;
-
         return (int) $this->sppg_id === $sppgId;
     }
 
-    /**
-     * Nama role yang ditampilkan ke FE.
-     * Ambil dari employee.role, bukan dari role_type.
-     */
     public function getRoleNameAttribute(): string
     {
         if ($this->isSuperAdmin()) return 'Super Admin';
-
         return $this->employee?->role?->name ?? 'Tanpa Akses';
     }
 }

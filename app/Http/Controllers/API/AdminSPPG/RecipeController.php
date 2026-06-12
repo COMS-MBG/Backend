@@ -8,37 +8,16 @@ use App\Http\Resources\RecipeResource;
 use App\Services\SPPG\RecipeService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controllers\HasMiddleware;
-use Illuminate\Routing\Controllers\Middleware;
 
-/**
- * CONTROLLER untuk Fitur Master Resep.
- * Endpoint CRUD + dropdown untuk dipakai di Perencanaan Menu.
- */
-class RecipeController extends Controller implements HasMiddleware
+class RecipeController extends Controller
 {
-    public function __construct(
-        private readonly RecipeService $recipeService
-    ) {}
+    public function __construct(private readonly RecipeService $recipeService) {}
 
-    public static function middleware(): array
-    {
-        return [
-            new Middleware('permission:recipes.read', only: ['index', 'show', 'dropdown']),
-            new Middleware('permission:recipes.create', only: ['store']),
-            new Middleware('permission:recipes.update', only: ['update']),
-            new Middleware('permission:recipes.delete', only: ['destroy']),
-        ];
-    }
-
-    // =============================================
-    // GET /api/recipes
-    // PINTU TARIK DATA: Semua resep + info nutrisinya
-    // =============================================
     public function index(Request $request): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         $filters = $request->only(['search', 'per_page']);
-        $recipes = $this->recipeService->getAll($filters);
+        $recipes = $this->recipeService->getAll($sppgId, $filters);
 
         return response()->json([
             'success' => true,
@@ -53,13 +32,10 @@ class RecipeController extends Controller implements HasMiddleware
         ]);
     }
 
-    // =============================================
-    // GET /api/recipes/dropdown
-    // PINTU TARIK DATA: Semua resep untuk dropdown form Perencanaan Menu
-    // =============================================
-    public function dropdown(): JsonResponse
+    public function dropdown(Request $request): JsonResponse
     {
-        $recipes = $this->recipeService->getAllForDropdown();
+        $sppgId = $request->attributes->get('sppg_id');
+        $recipes = $this->recipeService->getAllForDropdown($sppgId);
 
         return response()->json([
             'success' => true,
@@ -67,14 +43,11 @@ class RecipeController extends Controller implements HasMiddleware
         ]);
     }
 
-    // =============================================
-    // GET /api/recipes/{id}
-    // PINTU TARIK DATA: Detail resep + semua bahannya
-    // =============================================
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $recipe = $this->recipeService->findById($id);
+            $recipe = $this->recipeService->findById($sppgId, $id);
 
             return response()->json([
                 'success' => true,
@@ -88,23 +61,11 @@ class RecipeController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // POST /api/recipes
-    // PINTU MASUK DATA: Simpan resep baru + kalkulasi nutrisi otomatis
-    // Body JSON yang diharapkan:
-    // {
-    //   "name": "Ayam Bakar Keto",
-    //   "target_calorie": 3200,
-    //   "ingredients": [
-    //     { "ingredient_id": 1, "weight_used": 500 },
-    //     { "ingredient_id": 2, "weight_used": 200 }
-    //   ]
-    // }
-    // =============================================
     public function store(RecipeRequest $request): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $recipe = $this->recipeService->create($request->validated());
+            $recipe = $this->recipeService->create($sppgId, $request->validated());
 
             return response()->json([
                 'success' => true,
@@ -119,14 +80,11 @@ class RecipeController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // PUT /api/recipes/{id}
-    // PINTU MASUK DATA: Update resep + recalculate nutrisi
-    // =============================================
     public function update(RecipeRequest $request, int $id): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $recipe = $this->recipeService->update($id, $request->validated());
+            $recipe = $this->recipeService->update($sppgId, $id, $request->validated());
 
             return response()->json([
                 'success' => true,
@@ -146,13 +104,11 @@ class RecipeController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // DELETE /api/recipes/{id}
-    // =============================================
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $this->recipeService->delete($id);
+            $this->recipeService->delete($sppgId, $id);
 
             return response()->json([
                 'success' => true,

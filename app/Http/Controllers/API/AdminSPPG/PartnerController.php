@@ -7,7 +7,7 @@ use App\Http\Requests\Partner\ImportPartnerRequest;
 use App\Http\Requests\Partner\StorePartnerRequest;
 use App\Http\Requests\Partner\UpdatePartnerRequest;
 use App\Http\Resources\PartnerResource;
-use App\Services\Partner\PartnerService;
+use App\Services\SPPG\PartnerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -15,14 +15,13 @@ class PartnerController extends Controller
 {
     public function __construct(private readonly PartnerService $partnerService) {}
 
-    // ─── List ──────────────────────────────────────────────────────────────────
-
     public function index(Request $request): JsonResponse
     {
-        $partners = $this->partnerService->getAll(
-            $request->only(['school_type', 'ownership_status', 'district', 'city', 'search']),
-            $request->integer('per_page', 15),
-        );
+        $sppgId = $request->attributes->get('sppg_id');
+        $filters = $request->only(['school_type', 'ownership_status', 'district', 'city', 'search']);
+        $filters['per_page'] = $request->integer('per_page', 15);
+
+        $partners = $this->partnerService->getAll($sppgId, $filters);
 
         return response()->json([
             'success' => true,
@@ -36,33 +35,36 @@ class PartnerController extends Controller
         ]);
     }
 
-    // ─── Summary ───────────────────────────────────────────────────────────────
-
-    public function summary(): JsonResponse
+    public function summary(Request $request): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         return response()->json([
             'success' => true,
-            'data'    => $this->partnerService->getSummary(),
+            'data'    => $this->partnerService->getSummary($sppgId),
         ]);
     }
 
-    // ─── Show ──────────────────────────────────────────────────────────────────
-
-    public function show(string $id): JsonResponse
+    public function show(Request $request, string $id): JsonResponse
     {
-        $partner = $this->partnerService->findById($id);
-
-        return response()->json([
-            'success' => true,
-            'data'    => new PartnerResource($partner),
-        ]);
+        $sppgId = $request->attributes->get('sppg_id');
+        try {
+            $partner = $this->partnerService->findById($sppgId, (int) $id);
+            return response()->json([
+                'success' => true,
+                'data'    => new PartnerResource($partner),
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Partner tidak ditemukan.',
+            ], 404);
+        }
     }
-
-    // ─── Store ─────────────────────────────────────────────────────────────────
 
     public function store(StorePartnerRequest $request): JsonResponse
     {
-        $partner = $this->partnerService->create($request->validated());
+        $sppgId = $request->attributes->get('sppg_id');
+        $partner = $this->partnerService->create($sppgId, $request->validated());
 
         return response()->json([
             'success' => true,
@@ -71,52 +73,47 @@ class PartnerController extends Controller
         ], 201);
     }
 
-    // ─── Update ────────────────────────────────────────────────────────────────
-
     public function update(UpdatePartnerRequest $request, string $id): JsonResponse
     {
-        $partner = $this->partnerService->update($id, $request->validated());
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Partner school updated successfully.',
-            'data'    => new PartnerResource($partner),
-        ]);
+        $sppgId = $request->attributes->get('sppg_id');
+        try {
+            $partner = $this->partnerService->update($sppgId, (int) $id, $request->validated());
+            return response()->json([
+                'success' => true,
+                'message' => 'Partner school updated successfully.',
+                'data'    => new PartnerResource($partner),
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Partner tidak ditemukan.',
+            ], 404);
+        }
     }
 
-    // ─── Destroy ───────────────────────────────────────────────────────────────
-
-    public function destroy(string $id): JsonResponse
+    public function destroy(Request $request, string $id): JsonResponse
     {
-        $this->partnerService->delete($id);
-
-        return response()->json([
-            'success' => true,
-            'message' => 'Partner school deleted successfully.',
-        ]);
+        $sppgId = $request->attributes->get('sppg_id');
+        try {
+            $this->partnerService->delete($sppgId, (int) $id);
+            return response()->json([
+                'success' => true,
+                'message' => 'Partner school deleted successfully.',
+            ]);
+        } catch (\Illuminate\Database\Eloquent\ModelNotFoundException $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Partner tidak ditemukan.',
+            ], 404);
+        }
     }
-
-    // ─── Import ────────────────────────────────────────────────────────────────
 
     public function import(ImportPartnerRequest $request): JsonResponse
     {
-        $file   = $request->file('file');
-        $result = $this->partnerService->importFromFile($file->getRealPath());
-
-        if (empty($result['success'])) {
-            return response()->json([
-                'success'          => false,
-                'message'          => $result['errors'][0] ?? 'Import failed.',
-                'errors'           => $result['errors'] ?? [],
-                'missing_columns'  => $result['missing_columns'] ?? [],
-                'detected_columns' => $result['detected_columns'] ?? [],
-            ], 422);
-        }
-
-        return response()->json([
-            'success' => true,
-            'message' => "Import complete: {$result['created']} created, {$result['updated']} updated, {$result['skipped']} skipped.",
-            'data'    => $result,
-        ]);
+        $sppgId = $request->attributes->get('sppg_id');
+        $records = $request->input('records', []); 
+        
+        $count = $this->partnerService->importFromFile($sppgId, $records);
+        return response()->json(['success' => true, 'message' => "Berhasil mengimpor {$count} partner."]);
     }
 }

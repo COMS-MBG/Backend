@@ -13,20 +13,11 @@ use Illuminate\Routing\Controllers\Middleware;
 
 /**
  * CONTROLLER untuk Fitur Master Data Bahan Baku (Ingredient).
- * Analogi NestJS: IngredientController (*.controller.ts)
- *
- * Controller hanya bertugas:
- * 1. Nerima request
- * 2. Panggil Service
- * 3. Return response JSON
- *
- * SEMUA LOGIKA BISNIS ada di IngredientService, bukan di sini.
  */
 class IngredientController extends Controller implements HasMiddleware
 {
     public function __construct(
         private readonly IngredientService $ingredientService
-        // Analogi NestJS: constructor(private ingredientService: IngredientService) {}
     ) {}
 
     public static function middleware(): array
@@ -39,20 +30,16 @@ class IngredientController extends Controller implements HasMiddleware
         ];
     }
 
-    // =============================================
-    // GET /api/ingredients
-    // PINTU TARIK DATA: Ambil semua bahan baku
-    // =============================================
     public function index(Request $request): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         $filters = $request->only(['search', 'per_page']);
-        $ingredients = $this->ingredientService->getAll($filters);
+        $ingredients = $this->ingredientService->getAll($sppgId, $filters);
 
         return response()->json([
             'success' => true,
             'message' => 'Daftar bahan baku berhasil diambil.',
             'data'    => IngredientResource::collection($ingredients->items()),
-            // Info paginasi
             'meta' => [
                 'current_page' => $ingredients->currentPage(),
                 'last_page'    => $ingredients->lastPage(),
@@ -62,13 +49,10 @@ class IngredientController extends Controller implements HasMiddleware
         ]);
     }
 
-    // =============================================
-    // GET /api/ingredients/dropdown
-    // PINTU TARIK DATA: Daftar semua bahan untuk dropdown form resep
-    // =============================================
-    public function dropdown(): JsonResponse
+    public function dropdown(Request $request): JsonResponse
     {
-        $ingredients = $this->ingredientService->getAllForDropdown();
+        $sppgId = $request->attributes->get('sppg_id');
+        $ingredients = $this->ingredientService->getAllForDropdown($sppgId);
 
         return response()->json([
             'success' => true,
@@ -76,14 +60,11 @@ class IngredientController extends Controller implements HasMiddleware
         ]);
     }
 
-    // =============================================
-    // GET /api/ingredients/{id}
-    // PINTU TARIK DATA: Detail satu bahan baku
-    // =============================================
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $ingredient = $this->ingredientService->findById($id);
+            $ingredient = $this->ingredientService->findById($sppgId, $id);
 
             return response()->json([
                 'success' => true,
@@ -97,30 +78,23 @@ class IngredientController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // POST /api/ingredients
-    // PINTU MASUK DATA: Simpan bahan baku baru
-    // =============================================
     public function store(IngredientRequest $request): JsonResponse
     {
-        // $request->validated() = data yang sudah lolos validasi
-        $ingredient = $this->ingredientService->create($request->validated());
+        $sppgId = $request->attributes->get('sppg_id');
+        $ingredient = $this->ingredientService->create($sppgId, $request->validated());
 
         return response()->json([
             'success' => true,
             'message' => 'Bahan baku berhasil ditambahkan.',
             'data'    => new IngredientResource($ingredient),
-        ], 201); // 201 = Created
+        ], 201);
     }
 
-    // =============================================
-    // PUT /api/ingredients/{id}
-    // PINTU MASUK DATA: Update bahan baku
-    // =============================================
     public function update(IngredientRequest $request, int $id): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $ingredient = $this->ingredientService->update($id, $request->validated());
+            $ingredient = $this->ingredientService->update($sppgId, $id, $request->validated());
 
             return response()->json([
                 'success' => true,
@@ -135,14 +109,11 @@ class IngredientController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // DELETE /api/ingredients/{id}
-    // Hapus bahan baku
-    // =============================================
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $this->ingredientService->delete($id);
+            $this->ingredientService->delete($sppgId, $id);
 
             return response()->json([
                 'success' => true,
@@ -158,20 +129,17 @@ class IngredientController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // POST /api/ingredients/calculate-nutrition
-    // Preview kalkulasi nutrisi tanpa save (untuk live preview di FE)
-    // FE memanggil ini setiap user ketik berat di form resep
-    // =============================================
     public function calculateNutrition(Request $request): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         $request->validate([
-            'ingredient_id' => 'required|integer|exists:ingredients,id',
+            'ingredient_id' => 'required|integer',
             'weight'        => 'required|numeric|min:0.1',
         ]);
 
         try {
             $result = $this->ingredientService->calculateNutritionPreview(
+                $sppgId,
                 $request->ingredient_id,
                 $request->weight
             );
@@ -183,7 +151,7 @@ class IngredientController extends Controller implements HasMiddleware
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => $e->getMessage(),
+                'message' => 'Bahan baku tidak ditemukan atau error kalkulasi: ' . $e->getMessage(),
             ], 500);
         }
     }

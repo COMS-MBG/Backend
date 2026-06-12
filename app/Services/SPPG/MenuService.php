@@ -4,27 +4,14 @@ namespace App\Services\SPPG;
 
 use App\Models\Menu;
 use App\Models\MenuItem;
-use Carbon\Carbon;
+use App\Models\Recipe;
 use Illuminate\Support\Facades\DB;
 
-/**
- * SERVICE untuk fitur Perencanaan Menu.
- * Berisi logika: simpan menu, kalkulasi status, organisir per hari.
- */
 class MenuService
 {
-    /**
-     * Ambil semua perencanaan menu
-     *
-     * PINTU TARIK DATA: GET /api/menus
-     */
-    public function getAll(array $filters = [], ?int $sppgId = null)
+    public function getAll(int $sppgId, array $filters = [])
     {
-        $query = Menu::with(['menuItems.recipe']);
-
-        if ($sppgId) {
-            $query->where('sppg_id', $sppgId);
-        }
+        $query = Menu::with(['menuItems.recipe'])->where('sppg_id', $sppgId);
 
         if (!empty($filters['status'])) {
             $query->where('status', $filters['status']);
@@ -35,97 +22,45 @@ class MenuService
         }
 
         $perPage = $filters['per_page'] ?? 15;
-
         return $query->latest('week_start')->paginate($perPage);
     }
 
-    /**
-     * Ambil detail satu menu beserta semua item harinya
-     *
-     * PINTU TARIK DATA: GET /api/menus/{id}
-     */
-    public function findById(int $id): Menu
+    public function findByIdForSppg(int $sppgId, int $id): Menu
     {
         $menu = Menu::with([
             'menuItems' => function ($q) {
                 $q->with('recipe')->orderBy('day_of_week')->orderBy('order');
             }
-        ])->findOrFail($id);
+        ])->where('sppg_id', $sppgId)->findOrFail($id);
 
-        // Refresh status berdasarkan tanggal hari ini
         $this->refreshStatus($menu);
-
         return $menu;
     }
 
-    /**
-     * Buat perencanaan menu baru.
-     *
-     * PINTU MASUK DATA: POST /api/menus
-     *
-     * Format $data:
-     * [
-     *   'name'       => 'Menu Minggu ke-15',
-     *   'week_start' => '2025-04-07',   ← harus Senin
-     *   'week_end'   => '2025-04-10',   ← harus Kamis
-     *   'notes'      => '...',
-     *   'items' => [
-     *     [
-     *       'day_of_week' => 1,            ← 1=Senin
-     *       'menu_date'   => '2025-04-07',
-     *       'meal_time'   => 'lunch',
-     *       'recipe_id'   => 5,
-     *       'order'       => 1,
-     *     ],
-     *     [
-     *       'day_of_week' => 1,
-     *       'menu_date'   => '2025-04-07',
-     *       'meal_time'   => 'dinner',
-     *       'recipe_id'   => 3,
-     *       'order'       => 2,
-     *     ],
-     *     // dst untuk hari Selasa, Rabu, Kamis
-     *   ]
-     * ]
-     */
-    public function create(array $data): Menu
-{
-    return DB::transaction(function () use ($data) {
-
-        $status = Menu::computeStatus($data['week_start']);
-
-        $menu = Menu::create([
-            'sppg_id'    => $data['sppg_id'] ?? null,
-            'name'       => $data['name'],
-            'week_start' => $data['week_start'],
-            'week_end'   => $data['week_end'],
-            'status'     => $status,
-            'notes'      => $data['notes'] ?? null,
-        ]);
-
-        foreach ($data['items'] as $item) {
-            MenuItem::create([
-                'menu_id'     => $menu->id,
-                'recipe_id'   => $item['recipe_id'],
-                'day_of_week' => $item['day_of_week'],
-                'menu_date'   => $item['menu_date'],
-                'order'       => $item['order'] ?? 0,
-            ]);
-        }
-
-        return $menu->load('menuItems.recipe');
-    });
-}
-    /**
-     * Update perencanaan menu
-     *
-     * PINTU MASUK DATA: PUT /api/menus/{id}
-     */
-    public function update(int $id, array $data): Menu
+    public function create(int $sppgId, array $data): Menu
     {
-        return DB::transaction(function () use ($id, $data) {
-            $menu = Menu::findOrFail($id);
+        return DB::transaction(function () use ($sppgId, $data) {
+            $status = Menu::computeStatus($data['week_start']);
+            
+            $menu = Menu::create([
+                'sppg_id'    => $sppgId,
+                'name'       => $data['name'],
+                'week_start' => $data['week_start'],
+                'week_end'   => $data['week_end'],
+                'status'     => $status,
+                'notes'      => $data['notes'] ?? null,
+            ]);
 
+            $this->saveMenuItems($menu, $data['items'], $sppgId);
+
+            return $menu->load('menuItems.recipe');
+        });
+    }
+
+    public function update(int $sppgId, int $id, array $data): Menu
+    {
+        return DB::transaction(function () use ($sppgId, $id, $data) {
+            $menu = Menu::where('sppg_id', $sppgId)->findOrFail($id);
             $status = Menu::computeStatus($data['week_start'] ?? $menu->week_start);
 
             $menu->update([
@@ -136,69 +71,42 @@ class MenuService
                 'notes'      => $data['notes'] ?? $menu->notes,
             ]);
 
-            // Jika ada items baru, hapus yang lama dan ganti
             if (isset($data['items'])) {
                 $menu->menuItems()->delete();
-                $this->saveMenuItems($menu, $data['items']);
+                $this->saveMenuItems($menu, $data['items'], $sppgId);
             }
 
             return $menu->load('menuItems.recipe');
         });
     }
 
-    /**
-     * Hapus perencanaan menu
-     */
-    public function delete(int $id): bool
+    public function delete(int $sppgId, int $id): bool
     {
-        $menu = Menu::findOrFail($id);
-        $menu->menuItems()->delete(); // Hapus items dulu
+        $menu = Menu::where('sppg_id', $sppgId)->findOrFail($id);
+        $menu->menuItems()->delete();
         return $menu->delete();
     }
 
-    /**
-     * Perbarui status semua menu (bisa dijadwalkan sebagai CRON job harian)
-     * Dipanggil: php artisan schedule:run (jika disetup di Kernel.php)
-     */
-    public function refreshAllStatuses(): int
+    public function getMenuGroupedByDay(int $sppgId, int $menuId): array
     {
-        $menus   = Menu::whereNull('deleted_at')->whereNotIn('status', ['published', 'archived'])->get();
-        $updated = 0;
-
-        foreach ($menus as $menu) {
-            $newStatus = Menu::computeStatus($menu->week_start);
-            if ($menu->status !== $newStatus) {
-                $menu->update(['status' => $newStatus]);
-                $updated++;
-            }
-        }
-
-        return $updated;
-    }
-
-    /**
-     * Ambil data menu yang dikelompokkan per hari untuk response FE
-     * Output: ['monday' => [...items], 'tuesday' => [...], ...]
-     */
-    public function getMenuGroupedByDay(int $menuId): array
-    {
-        $menu = $this->findById($menuId);
-
+        $menu = $this->findByIdForSppg($sppgId, $menuId);
+        
         $grouped = [
             1 => ['label' => 'Senin',  'date' => null, 'items' => []],
             2 => ['label' => 'Selasa', 'date' => null, 'items' => []],
             3 => ['label' => 'Rabu',   'date' => null, 'items' => []],
             4 => ['label' => 'Kamis',  'date' => null, 'items' => []],
+            5 => ['label' => 'Jumat',  'date' => null, 'items' => []],
+            6 => ['label' => 'Sabtu',  'date' => null, 'items' => []],
+            7 => ['label' => 'Minggu', 'date' => null, 'items' => []],
         ];
 
         foreach ($menu->menuItems as $item) {
             $day = $item->day_of_week;
             if (isset($grouped[$day])) {
-                $grouped[$day]['date']    = $item->menu_date->format('Y-m-d');
+                $grouped[$day]['date']    = $item->menu_date ? $item->menu_date->format('Y-m-d') : null;
                 $grouped[$day]['items'][] = [
                     'id'              => $item->id,
-                    //'meal_time'       => $item->meal_time,
-                    //'meal_time_label' => $item->meal_time_label,
                     'order'           => $item->order,
                     'recipe'          => $item->recipe ? [
                         'id'            => $item->recipe->id,
@@ -209,26 +117,29 @@ class MenuService
                 ];
             }
         }
-
         return [
-            'menu'    => $menu,
-            'days'    => $grouped,
+            'menu' => $menu,
+            'days' => $grouped,
         ];
     }
 
-    // =============================================
-    // PRIVATE HELPERS
-    // =============================================
+    public function publish(int $sppgId, int $id): Menu
+    {
+        $menu = $this->findByIdForSppg($sppgId, $id);
+        $menu->update(['status' => 'published']);
+        return $menu;
+    }
 
-    private function saveMenuItems(Menu $menu, array $items): void
+    private function saveMenuItems(Menu $menu, array $items, int $sppgId): void
     {
         foreach ($items as $item) {
+            Recipe::where('sppg_id', $sppgId)->findOrFail($item['recipe_id']);
+
             MenuItem::create([
                 'menu_id'     => $menu->id,
                 'recipe_id'   => $item['recipe_id'],
                 'day_of_week' => $item['day_of_week'],
                 'menu_date'   => $item['menu_date'],
-                //'meal_time' => null,
                 'order'       => $item['order'] ?? 0,
             ]);
         }

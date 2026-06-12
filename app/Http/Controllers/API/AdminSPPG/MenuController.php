@@ -8,37 +8,16 @@ use App\Http\Resources\MenuResource;
 use App\Services\SPPG\MenuService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Routing\Controllers\HasMiddleware;
-use Illuminate\Routing\Controllers\Middleware;
 
-/**
- * CONTROLLER untuk Fitur Perencanaan Menu.
- */
-class MenuController extends Controller implements HasMiddleware
+class MenuController extends Controller
 {
-    public function __construct(
-        private readonly MenuService $menuService
-    ) {}
+    public function __construct(private readonly MenuService $menuService) {}
 
-    public static function middleware(): array
-    {
-        return [
-            new Middleware('permission:menus.read', only: ['index', 'show', 'showGrouped']),
-            new Middleware('permission:menus.create', only: ['store']),
-            new Middleware('permission:menus.update', only: ['update', 'publish', 'refreshStatuses']),
-            new Middleware('permission:menus.delete', only: ['destroy']),
-        ];
-    }
-
-    // =============================================
-    // GET /api/menus
-    // PINTU TARIK DATA: Semua perencanaan menu
-    // Query params: ?status=published&search=minggu&per_page=10
-    // =============================================
     public function index(Request $request): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         $filters = $request->only(['search', 'status', 'per_page']);
-        $menus   = $this->menuService->getAll($filters, $request->user()->sppg_id);
+        $menus   = $this->menuService->getAll($sppgId, $filters);
 
         return response()->json([
             'success' => true,
@@ -53,14 +32,11 @@ class MenuController extends Controller implements HasMiddleware
         ]);
     }
 
-    // =============================================
-    // GET /api/menus/{id}
-    // PINTU TARIK DATA: Detail menu + semua resep per harinya
-    // =============================================
-    public function show(int $id): JsonResponse
+    public function show(Request $request, int $id): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $menu = $this->menuService->findById($id);
+            $menu = $this->menuService->findByIdForSppg($sppgId, $id);
 
             return response()->json([
                 'success' => true,
@@ -74,14 +50,11 @@ class MenuController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // GET /api/menus/{id}/grouped
-    // PINTU TARIK DATA: Menu dikelompokkan per hari (untuk tampilan kalender FE)
-    // =============================================
-    public function showGrouped(int $id): JsonResponse
+    public function showGrouped(Request $request, int $id): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $result = $this->menuService->getMenuGroupedByDay($id);
+            $result = $this->menuService->getMenuGroupedByDay($sppgId, $id);
 
             return response()->json([
                 'success' => true,
@@ -98,27 +71,11 @@ class MenuController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // POST /api/menus
-    // PINTU MASUK DATA: Buat perencanaan menu baru
-    // Body JSON yang diharapkan:
-    // {
-    //   "name": "Menu Minggu ke-15",
-    //   "week_start": "2025-04-07",
-    //   "week_end": "2025-04-10",
-    //   "items": [
-    //     { "day_of_week": 1, "menu_date": "2025-04-07", "recipe_id": 1, "meal_time": "lunch" },
-    //     { "day_of_week": 1, "menu_date": "2025-04-07", "recipe_id": 2, "meal_time": "dinner" },
-    //     { "day_of_week": 2, "menu_date": "2025-04-08", "recipe_id": 3, "meal_time": "lunch" }
-    //   ]
-    // }
-    // =============================================
     public function store(MenuRequest $request): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $data           = $request->validated();
-            $data['sppg_id'] = $request->user()->sppg_id;
-            $menu = $this->menuService->create($data);
+            $menu = $this->menuService->create($sppgId, $request->validated());
 
             return response()->json([
                 'success' => true,
@@ -133,14 +90,11 @@ class MenuController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // PUT /api/menus/{id}
-    // PINTU MASUK DATA: Update perencanaan menu
-    // =============================================
     public function update(MenuRequest $request, int $id): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $menu = $this->menuService->update($id, $request->validated());
+            $menu = $this->menuService->update($sppgId, $id, $request->validated());
 
             return response()->json([
                 'success' => true,
@@ -160,13 +114,11 @@ class MenuController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // DELETE /api/menus/{id}
-    // =============================================
-    public function destroy(int $id): JsonResponse
+    public function destroy(Request $request, int $id): JsonResponse
     {
+        $sppgId = $request->attributes->get('sppg_id');
         try {
-            $this->menuService->delete($id);
+            $this->menuService->delete($sppgId, $id);
 
             return response()->json([
                 'success' => true,
@@ -185,31 +137,13 @@ class MenuController extends Controller implements HasMiddleware
         }
     }
 
-    // =============================================
-    // POST /api/menus/refresh-statuses
-    // Update status semua menu (bisa dijadikan endpoint admin atau CRON)
-    // =============================================
-    public function refreshStatuses(): JsonResponse
-    {
-        $updated = $this->menuService->refreshAllStatuses();
-
-        return response()->json([
-            'success' => true,
-            'message' => "{$updated} menu berhasil diperbarui statusnya.",
-        ]);
-    }
-
-    // =============================================
-    // PATCH /api/menus/{id}/publish
-    // Publikasikan menu mingguan dengan validasi stok hard block
-    // =============================================
     public function publish(Request $request, int $id, \App\Services\Stock\StockService $stockService): JsonResponse
     {
-        $sppgId = $request->user()->sppg_id;
+        $sppgId = $request->attributes->get('sppg_id');
         $userId = $request->user()->id;
 
         try {
-            $menu = \App\Models\Menu::findOrFail($id);
+            $menu = $this->menuService->findByIdForSppg($sppgId, $id);
 
             if (in_array($menu->status, ['published', 'archived'])) {
                 return response()->json([
@@ -218,16 +152,14 @@ class MenuController extends Controller implements HasMiddleware
                 ], 422);
             }
 
-            // Deduct stock (runs validation and FIFO deduction in transaction)
             $stockService->deductStockForMenu($sppgId, $id, $userId);
-
-            // Update status
-            $menu->update(['status' => 'published']);
+            
+            $publishedMenu = $this->menuService->publish($sppgId, $id);
 
             return response()->json([
                 'success' => true,
                 'message' => 'Perencanaan menu berhasil dipublikasikan.',
-                'data'    => new MenuResource($menu),
+                'data'    => new MenuResource($publishedMenu),
             ]);
         } catch (\App\Exceptions\StockShortageException $e) {
             throw $e;
@@ -242,5 +174,16 @@ class MenuController extends Controller implements HasMiddleware
                 'message' => 'Gagal mempublikasikan menu: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    public function refreshStatuses(): JsonResponse
+    {
+        // Tetap menggunakan helper Service jika perlu
+        $updated = $this->menuService->refreshAllStatuses();
+
+        return response()->json([
+            'success' => true,
+            'message' => "{$updated} menu berhasil diperbarui statusnya.",
+        ]);
     }
 }

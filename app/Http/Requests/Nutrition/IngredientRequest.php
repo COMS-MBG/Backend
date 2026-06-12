@@ -6,27 +6,13 @@ use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Contracts\Validation\Validator;
 use Illuminate\Http\Exceptions\HttpResponseException;
 
-/**
- * REQUEST = Validasi input sebelum masuk ke Controller.
- * Analogi NestJS: DTO + class-validator (@IsString, @IsNumber, dll)
- *
- * File ini dipakai untuk POST (create) dan PUT (update) ingredient.
- */
 class IngredientRequest extends FormRequest
 {
-    /**
-     * Siapa yang boleh mengakses endpoint ini?
-     * Kembalikan true = semua boleh (atur di middleware route jika perlu auth)
-     */
     public function authorize(): bool
     {
         return true;
     }
 
-    /**
-     * Aturan validasi
-     * Analogi NestJS: class-validator decorators di DTO
-     */
     public function rules(): array
     {
         return [
@@ -40,9 +26,6 @@ class IngredientRequest extends FormRequest
         ];
     }
 
-    /**
-     * Pesan error kustom
-     */
     public function messages(): array
     {
         return [
@@ -59,10 +42,6 @@ class IngredientRequest extends FormRequest
         ];
     }
 
-    /**
-     * Override response error agar selalu return JSON (bukan redirect HTML).
-     * PENTING untuk API backend — tanpa ini Laravel bisa return redirect 302.
-     */
     protected function failedValidation(Validator $validator)
     {
         throw new HttpResponseException(
