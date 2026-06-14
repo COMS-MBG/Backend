@@ -148,9 +148,19 @@ class SppgRegistrationService
 
             // 6. Insert/Update data mitra in partners table
             foreach ($data['partners'] as $partnerItem) {
+                $partner = null;
                 if (!empty($partnerItem['id'])) {
-                    $partner = Partner::findOrFail($partnerItem['id']);
+                    $partner = Partner::find($partnerItem['id']);
+                }
+                if (!$partner && !empty($partnerItem['npsn'])) {
+                    $partner = Partner::where('npsn', $partnerItem['npsn'])->first();
+                }
+
+                if ($partner) {
                     $partner->sppg_id = $sppg->id;
+                    if (isset($partnerItem['portion_count'])) {
+                        $partner->portion_count = $partnerItem['portion_count'];
+                    }
                     $partner->save();
                 } else {
                     Partner::create([

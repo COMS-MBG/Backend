@@ -84,7 +84,8 @@ class DashboardController extends Controller
                 })
                 ->where('status', 'active')
                 ->count(),
-            'total_schools'  => School::where('sppg_id', $sppgId)->count(),
+            'total_schools'  => \App\Models\Partner::where('sppg_id', $sppgId)->count(),
+            'total_portions' => (int) \App\Models\Partner::where('sppg_id', $sppgId)->sum('portion_count'),
         ];
 
         // ── Staff Completeness Check ──

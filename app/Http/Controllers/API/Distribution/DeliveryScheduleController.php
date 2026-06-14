@@ -37,9 +37,18 @@ class DeliveryScheduleController extends Controller
     // PINTU KELUAR – FE list view
     public function index(Request $request): JsonResponse
     {
+        // ── Isolasi by SPPG ───────────────────────────────────────────────────
+        // sppg_id di-inject oleh middleware scope.sppg (null hanya untuk superadmin)
+        $sppgId = $request->attributes->get('sppg_id');
+
         $query = DeliverySchedule::active()
             ->with(['courier', 'school', 'assignedBy', 'submittedBy', 'latestLocation'])
             ->latest();
+
+        // Filter by SPPG — via school.sppg_id (skip untuk superadmin)
+        if ($sppgId) {
+            $query->whereHas('school', fn ($q) => $q->where('sppg_id', $sppgId));
+        }
 
         // Kurir hanya melihat jadwal miliknya sendiri
         if ($request->user()->hasAnyRole(['courier'])) {
@@ -242,6 +251,9 @@ class DeliveryScheduleController extends Controller
     {
         abort_unless($request->user()->hasAnyRole(['logistics_admin', 'super_admin', 'sppg_admin']), 403);
 
+        // ── Isolasi by SPPG ───────────────────────────────────────────────────
+        $sppgId = $request->attributes->get('sppg_id');
+
         $couriers = Employee::query()
             ->where(function ($q) {
                 // Filter by structural position
@@ -251,6 +263,8 @@ class DeliveryScheduleController extends Controller
             })
             ->where('status', 'active')
             ->whereNotNull('user_id') // harus punya akun agar bisa menerima notifikasi
+            // Isolasi kurir hanya milik SPPG yang login (superadmin lihat semua)
+            ->when($sppgId, fn($q) => $q->where('sppg_id', $sppgId))
             ->select(['id', 'name', 'phone', 'position'])
             ->orderBy('name')
             ->get()

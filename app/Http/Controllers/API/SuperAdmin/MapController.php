@@ -332,30 +332,50 @@ class MapController extends Controller
 
     private function buildSubmissionLayers(): array
     {
-        return SppgDraft::whereNotNull('latitude')
-            ->whereNotNull('longitude')
-            ->where('status', 'draft')
+        // Ambil semua draft berstatus 'draft' — tanpa filter lat/lng
+        // agar public submission yang geocode-nya gagal tetap muncul
+        return SppgDraft::where('status', 'draft')
             ->with(['partners' => fn($q) => $q->select('id', 'draft_id', 'school_name', 'latitude', 'longitude', 'jumlah_porsi', 'data_source')])
             ->get()
-            ->map(fn($d) => [
-                'id'                  => $d->id,
-                'submission_number'   => $d->submission_number,
-                'latitude'            => $d->latitude,
-                'longitude'           => $d->longitude,
-                'confirmed_latitude'  => $d->confirmed_latitude,
-                'confirmed_longitude' => $d->confirmed_longitude,
-                'point_status'        => $d->point_status,
-                'map_confirmed'       => $d->map_confirmed,
-                'status'              => $d->status,
-                'partners'            => $d->partners->map(fn($p) => [
-                    'id'           => $p->id,
-                    'school_name'  => $p->school_name,
-                    'latitude'     => $p->latitude,
-                    'longitude'    => $p->longitude,
-                    'jumlah_porsi' => $p->jumlah_porsi,
-                    'data_source'  => $p->data_source,
-                ])->values()->all(),
-            ])
-            ->values()->all();
+            ->map(function ($d) {
+                // Prioritas koordinat: kolom utama → form1_data → null (skip)
+                $lat = $d->latitude;
+                $lng = $d->longitude;
+
+                // Fallback ke form1_data jika kolom utama null
+                if ((!$lat || !$lng) && !empty($d->form1_data)) {
+                    $f1  = is_array($d->form1_data) ? $d->form1_data : json_decode($d->form1_data, true);
+                    $lat = $f1['latitude']  ?? null;
+                    $lng = $f1['longitude'] ?? null;
+                }
+
+                // Skip draft yang sama sekali tidak punya koordinat
+                if (!$lat || !$lng) return null;
+
+                return [
+                    'id'                  => $d->id,
+                    'submission_number'   => $d->submission_number,
+                    'latitude'            => (float) $lat,
+                    'longitude'           => (float) $lng,
+                    'confirmed_latitude'  => $d->confirmed_latitude,
+                    'confirmed_longitude' => $d->confirmed_longitude,
+                    'point_status'        => $d->point_status,
+                    'map_confirmed'       => $d->map_confirmed,
+                    'status'              => $d->status,
+                    'source'              => $d->source,
+                    'needs_geocode'       => !$d->latitude || !$d->longitude, // flag: koordinat belum tersimpan di kolom utama
+                    'partners'            => $d->partners->map(fn($p) => [
+                        'id'           => $p->id,
+                        'school_name'  => $p->school_name,
+                        'latitude'     => $p->latitude,
+                        'longitude'    => $p->longitude,
+                        'jumlah_porsi' => $p->jumlah_porsi,
+                        'data_source'  => $p->data_source,
+                    ])->values()->all(),
+                ];
+            })
+            ->filter() // hapus yang null (tidak punya koordinat sama sekali)
+            ->values()
+            ->all();
     }
 }

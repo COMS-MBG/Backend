@@ -208,11 +208,23 @@ class LandingController extends Controller
             'nama_instansi'    => 'nullable|string|max:255',
             'nama_sppg_usulan' => 'required|string|max:255',
             'alamat'           => 'required|string',
-            'provinsi_id'      => 'required|string', // Sesuai dengan form UI
-            'kota_id'          => 'required|string', // Sesuai dengan form UI
+            'provinsi_id'      => 'required|string',
+            'kota_id'          => 'required|string',
             'estimasi_sekolah' => 'required|integer|min:1',
             'alasan'           => 'required|string',
-            'dokumen_proposal' => 'required|file|mimes:pdf|max:2048', // PDF max 2MB
+            'dokumen_proposal' => 'required|file|mimes:pdf|max:20480', // PDF max 20MB
+        ], [
+            'dokumen_proposal.required' => 'Dokumen proposal wajib diunggah.',
+            'dokumen_proposal.mimes'    => 'Dokumen proposal harus berformat PDF.',
+            'dokumen_proposal.max'      => 'Ukuran dokumen proposal maksimal 20 MB. Silakan kompres PDF Anda terlebih dahulu.',
+            'nama_pemohon.required'     => 'Nama pemohon wajib diisi.',
+            'email_pemohon.required'    => 'Email pemohon wajib diisi.',
+            'email_pemohon.email'       => 'Format email tidak valid.',
+            'no_hp.required'            => 'Nomor HP wajib diisi.',
+            'nama_sppg_usulan.required' => 'Nama SPPG usulan wajib diisi.',
+            'alamat.required'           => 'Alamat wajib diisi.',
+            'estimasi_sekolah.required' => 'Estimasi jumlah sekolah wajib diisi.',
+            'alasan.required'           => 'Alasan pengajuan wajib diisi.',
         ]);
 
         try {
@@ -238,34 +250,40 @@ class LandingController extends Controller
             }
             $submissionNumber = $prefix . str_pad($seq, 3, '0', STR_PAD_LEFT);
 
-            // Auto-geocoding via OpenStreetMap Nominatim
-            $latitude = null;
-            $longitude = null;
-            try {
-                $addressQuery = implode(', ', array_filter([
-                    $request->alamat,
-                    $request->kota_id,
-                    $request->provinsi_id,
-                ]));
+            // ── Koordinat: prioritaskan yang dikirim dari frontend (mini-map) ──
+            // Frontend mengirim lat/lng yang sudah diverifikasi user via Nominatim + drag marker
+            $latitude  = $request->filled('latitude')  ? (float) $request->latitude  : null;
+            $longitude = $request->filled('longitude') ? (float) $request->longitude : null;
 
-                $url = 'https://nominatim.openstreetmap.org/search?q='
-                    . urlencode($addressQuery)
-                    . '&format=json&limit=1';
+            // Fallback: geocoding server-side jika frontend tidak mengirim koordinat
+            if (!$latitude || !$longitude) {
+                try {
+                    $addressQuery = implode(', ', array_filter([
+                        $request->alamat,
+                        $request->kota_id,
+                        $request->provinsi_id,
+                        'Indonesia',
+                    ]));
 
-                $res = Http::timeout(5)
-                    ->withHeaders(['User-Agent' => 'COMS-MBG-Landing/1.0'])
-                    ->get($url);
+                    $url = 'https://nominatim.openstreetmap.org/search?q='
+                        . urlencode($addressQuery)
+                        . '&format=json&limit=1&countrycodes=id';
 
-                if ($res->successful() && !empty($res->json()[0])) {
-                    $geo = $res->json()[0];
-                    $latitude = (float) $geo['lat'];
-                    $longitude = (float) $geo['lon'];
+                    $res = Http::timeout(8)
+                        ->withHeaders(['User-Agent' => 'COMS-MBG-Landing/1.0', 'Accept-Language' => 'id'])
+                        ->get($url);
+
+                    if ($res->successful() && !empty($res->json()[0])) {
+                        $geo = $res->json()[0];
+                        $latitude  = (float) $geo['lat'];
+                        $longitude = (float) $geo['lon'];
+                    }
+                } catch (\Exception $georefError) {
+                    Log::warning('Auto geocoding public submission failed: ' . $georefError->getMessage());
                 }
-            } catch (\Exception $georefError) {
-                Log::warning('Auto geocoding public submission failed: ' . $georefError->getMessage());
             }
 
-            SppgDraft::create([
+            $draft = SppgDraft::create([
                 'submission_number' => $submissionNumber,
                 'submitted_by'      => null,
                 'source'            => 'public',
@@ -282,16 +300,18 @@ class LandingController extends Controller
                     'nama_instansi'    => $request->nama_instansi,
                     'alasan'           => $request->alasan,
                     'dokumen_proposal' => $path,
+                    'latitude'         => $latitude,   // disimpan juga di JSON sebagai backup
+                    'longitude'        => $longitude,
                 ],
-                'form2_data'        => null,
-                'form3_data'        => null,
-                'latitude'          => $latitude,
-                'longitude'         => $longitude,
-                'confirmed_latitude'=> null,
+                'form2_data'         => null,
+                'form3_data'         => null,
+                'latitude'           => $latitude,
+                'longitude'          => $longitude,
+                'confirmed_latitude' => null,
                 'confirmed_longitude'=> null,
-                'point_status'      => null,
-                'map_confirmed'     => false,
-                'status'            => 'draft',
+                'point_status'       => null,
+                'map_confirmed'      => false,
+                'status'             => 'draft',
             ]);
 
             return response()->json([
