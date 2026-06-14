@@ -24,12 +24,15 @@ class DeliveryHistoryController extends Controller
     // ─── [GET] Paginated list ─────────────────────────────────────────────────
     public function index(Request $request): JsonResponse
     {
+        // Isolasi by SPPG — history diakses via school.sppg_id
+        $sppgId = $request->attributes->get('sppg_id');
+
         $query = DeliveryHistory::with(['confirmedBy'])
+            ->whereHas('school', fn ($q) => $q->where('sppg_id', $sppgId))
             ->whereNotNull('confirmed_at')
             ->latest('confirmed_at');
 
         // Kurir hanya melihat riwayat miliknya sendiri
-        // BUG FIX: hasRole() → hasAnyRole()
         if ($request->user()->hasAnyRole(['courier'])) {
             $courierId = $request->user()->employee?->id;
             $query->where('courier_id', $courierId);
@@ -67,8 +70,16 @@ class DeliveryHistoryController extends Controller
     }
 
     // ─── [GET] Single history detail ──────────────────────────────────────────
-    public function show(DeliveryHistory $history): JsonResponse
+    public function show(Request $request, DeliveryHistory $history): JsonResponse
     {
+        // Verifikasi riwayat milik SPPG yang sedang login
+        $sppgId = $request->attributes->get('sppg_id');
+        abort_unless(
+            $history->school?->sppg_id === $sppgId,
+            403,
+            'Riwayat ini bukan milik SPPG Anda.'
+        );
+
         $history->load(['courier', 'school', 'confirmedBy', 'schedule']);
 
         return response()->json([
@@ -86,11 +97,15 @@ class DeliveryHistoryController extends Controller
             403
         );
 
+        // Isolasi by SPPG — hanya analytics milik SPPG yang login
+        $sppgId = $request->attributes->get('sppg_id');
+
         $from = $request->filled('date_from') ? \Illuminate\Support\Carbon::parse($request->date_from) : now()->startOfMonth();
         $to   = $request->filled('date_to') ? \Illuminate\Support\Carbon::parse($request->date_to) : now()->endOfMonth();
 
         $histories = DeliveryHistory::whereNotNull('confirmed_at')
             ->whereBetween('confirmed_at', [$from, $to])
+            ->whereHas('school', fn ($q) => $q->where('sppg_id', $sppgId))
             ->get();
 
         return response()->json([

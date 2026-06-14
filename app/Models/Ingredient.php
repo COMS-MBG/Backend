@@ -27,6 +27,7 @@ class Ingredient extends Model
      * Analogi NestJS: @Column() di entity + DTO whitelist
      */
     protected $fillable = [
+        'sppg_id',
         'name',
         'carbohydrate',
         'protein',

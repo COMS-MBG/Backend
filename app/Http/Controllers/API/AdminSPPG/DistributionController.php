@@ -42,16 +42,24 @@ class DistributionController extends Controller implements HasMiddleware
      */
     public function index(Request $request): JsonResponse
     {
-        $query = DeliverySchedule::active()
-            ->with(['courier', 'school', 'assignedBy', 'submittedBy', 'latestLocation'])
+        // Scope isolasi by SPPG — delivery_schedules tidak punya sppg_id langsung,
+        // sehingga kita filter melalui relasi school
+        $sppgId = $request->attributes->get('sppg_id');
+
+        $query = DeliverySchedule::with(['courier', 'school', 'assignedBy', 'submittedBy', 'latestLocation'])
+            ->whereHas('school', fn ($q) => $q->where('sppg_id', $sppgId))
             ->latest();
 
+        // Kurir hanya melihat jadwal miliknya sendiri
         if ($request->user()->hasAnyRole(['courier'])) {
             $query->forCourier($request->user()->employee?->id ?? 0);
         }
 
         if ($request->filled('status')) {
             $query->where('status', $request->status);
+        } else {
+            // Default: tampilkan semua status kecuali yang sudah confirmed/rejected lama
+            $query->whereNotIn('status', []);
         }
 
         if ($request->filled('courier_id')) {
@@ -78,8 +86,16 @@ class DistributionController extends Controller implements HasMiddleware
     /**
      * [GET] Detail satu jadwal.
      */
-    public function show(DeliverySchedule $schedule): JsonResponse
+    public function show(Request $request, DeliverySchedule $schedule): JsonResponse
     {
+        // Pastikan jadwal ini memang milik SPPG yang sedang login
+        $sppgId = $request->attributes->get('sppg_id');
+        abort_unless(
+            $schedule->school?->sppg_id === $sppgId,
+            403,
+            'Jadwal ini bukan milik SPPG Anda.'
+        );
+
         $schedule->load(['courier', 'school', 'assignedBy', 'submittedBy', 'confirmedBy', 'latestLocation']);
 
         return response()->json([
@@ -98,7 +114,16 @@ class DistributionController extends Controller implements HasMiddleware
             'schedule_id' => ['required', 'integer', 'exists:delivery_schedules,id'],
         ]);
 
+        $sppgId  = $request->attributes->get('sppg_id');
         $schedule = DeliverySchedule::findOrFail($request->schedule_id);
+
+        // Verifikasi jadwal milik SPPG ini
+        abort_unless(
+            $schedule->school?->sppg_id === $sppgId,
+            403,
+            'Jadwal ini bukan milik SPPG Anda.'
+        );
+
         $schedule = $this->service->submitTask($schedule, $request->user()->id);
 
         return response()->json([

@@ -1,104 +1,244 @@
-# Analisis Alur Kerja, Konflik, dan Bug Sistem Admin SPPG
+# Laporan Analisis Alur Kerja Detil, Konflik Logika, dan Berkas Bermasalah (Admin SPPG)
 
-Dokumen ini menyajikan analisis mendalam mengenai alur kerja (workflow) Admin SPPG pada sistem **COMS-MBG**, mengidentifikasi **Bug Kritis** dan **Konflik Logika**, serta merinci **Alur UX Detail** sebagai panduan pengujian atau analisis manual.
+Dokumen ini merinci penelusuran alur kerja (step-by-step workflow tracing) sisi **Admin SPPG**, titik konflik variabel/database, berkas kode yang bermasalah beserta barisnya, serta visualisasi alur kegagalan sistem.
 
 ---
 
-## 1. ⚙️ DAFTAR BUG & KONFLIK LOGIKA DI TEMUKAN
+## 1. 🗺️ Penelusuran Alur Kerja & Titik Konflik (Step-by-Step Tracing)
 
-Berdasarkan analisis kode sumber di `app/Http/Controllers/API/AdminSPPG/` dan dependensinya, ditemukan beberapa celah keamanan, inkonsistensi data, dan bug logika yang signifikan:
+### 🔑 Alur 1: Login & Resolusi Tenant ID (Staff vs Owner)
 
-### 🔴 1. Kebocoran Data Multi-Tenancy (Data Leakage)
-Sistem COMS-MBG dirancang agar setiap SPPG (Satuan Penyelenggara Program Gizi) terisolasi. Namun, beberapa endpoint di bawah namespace `AdminSPPG` tidak memfilter data berdasarkan `sppg_id` pengguna yang login:
+Alur ini menelusuri bagaimana sistem mengenali identitas SPPG dari pengguna yang masuk untuk membatasi akses data.
 
-*   **A. Distribusi & Jadwal Pengiriman (`DistributionController` & `DeliveryScheduleController`)**
-    *   **Masalah:** Saat mengambil list aktif (`index`) atau detail (`show`), sistem mengambil data `DeliverySchedule` secara global tanpa memfilter berdasarkan `sppg_id` dari user/sekolah/kurir yang terhubung.
-    *   **Dampak:** Admin SPPG A dapat melihat jadwal pengiriman, tujuan sekolah, nama kurir, dan detail logistik dari SPPG B. Admin juga bisa memanggil `submitTask` untuk mengirim tugas kurir milik SPPG lain.
-*   **B. Manajemen Mitra (`PartnerController` & `PartnerService`)**
-    *   **Masalah:** Endpoint `GET /api/admin-sppg/partners` memanggil `PartnerService::getAll()` yang tidak menerima parameter `sppg_id`. Begitu pula dengan `summary`, `store`, `update`, dan `destroy`.
-    *   **Dampak:** Admin SPPG A dapat melihat, mengubah, menghapus, bahkan mengimpor mitra sekolah milik SPPG B secara bebas.
-*   **C. Manajemen Perencanaan Menu (`MenuController` & `MenuService`)**
-    *   **Masalah:** Walaupun `index` dan `store` telah menggunakan `sppg_id`, method `show`, `showGrouped`, `update`, dan `destroy` langsung memanggil `Menu::findOrFail($id)` secara global.
-    *   **Dampak:** Admin SPPG A dapat melihat layout menu detail, mengubah isi resep harian, atau menghapus rencana menu milik SPPG B jika mengetahui atau menebak ID menu tersebut.
+```mermaid
+sequenceDiagram
+    autonumber
+    actor Staff as Ahli Gizi / Logistik
+    participant FE as Frontend View
+    participant MW as Middleware (ScopeBySppg)
+    participant DB as Database (Postgres)
+    participant Ctrl as Stock/Report Controller
 
-### 🔴 2. Duplikasi & Sinkronisasi Entitas Sekolah vs Mitra (Functional Conflict)
-Sistem memiliki dua tabel independen yang sama-sama merepresentasikan sekolah penerima makanan:
-1.  Tabel `schools` (dibuat oleh Super Admin atau admin lokal, digunakan untuk **Jadwal Distribusi**).
-2.  Tabel `partners` (mitra, terdaftar melalui registrasi/draft SPPG, digunakan untuk **Porsi Makan & Kalkulasi Nutrisi/Stok**).
+    Staff->>FE: Buka Halaman (e.g. Gudang Stok)
+    FE->>MW: Request ke API (e.g. GET /api/admin-sppg/stocks)
+    MW->>DB: Cek user login & data employee
+    Note over MW,DB: User staff tidak punya sppg_id di tabel 'users',<br/>tetapi di tabel 'employees' via user_id.
+    DB-->>MW: Kembalikan sppg_id = 9 (Coblong)
+    MW->>MW: Inject sppg_id ke Request Attributes
+    MW->>Ctrl: Teruskan Request
 
-*   **Konflik Logika:**
-    *   Meskipun ada kode sinkronisasi berdasarkan `npsn` di `SPPGService::assignSchool()` dan `detachSchool()`, sinkronisasi ini **tidak berjalan** saat sekolah/mitra baru ditambahkan secara langsung via `SchoolController::store()` atau `PartnerController::store()`.
-    *   Jika data di kedua tabel ini tidak sinkron (misalnya, jumlah siswa di `schools.student_count` berbeda dengan porsi di `partners.portion_count`, atau daftar sekolahnya berbeda), maka **kalkulasi pengurangan stok FIFO bahan baku** (yang menggunakan porsi mitra) akan bertolak belakang dengan **rencana pengiriman riil** (yang menggunakan data sekolah).
+    rect rgb(240, 200, 200)
+        Note over Ctrl: KONFLIK DI SINI!<br/>Controller bypass request attributes dan membaca:<br/>$sppgId = $request->user()->sppg_id
+        Ctrl->>DB: Query: SELECT * WHERE sppg_id = NULL
+        DB-->>Ctrl: Data Kosong
+    end
 
-### 🟠 3. Pengubahan Tarif Pengiriman Global oleh Admin Lokal
-*   **Masalah:** Di `FinancialReportController.php`, terdapat endpoint `PUT /api/admin-sppg/reports/financial/rates/{vehicleType}` yang dilindungi oleh permission `report.update`.
-*   **Konflik Logika:** Tabel `shipping_rates` bersifat global (tidak memiliki `sppg_id`). Celah ini memungkinkan seorang Admin SPPG lokal mengubah tarif per-kilometer kendaraan secara global, yang akan memengaruhi perhitungan biaya pengiriman seluruh SPPG di sistem.
+    Ctrl-->>FE: Kembalikan respon {"success": true, "data": []}
+    FE-->>Staff: Tampilan kosong (Master bahan tidak nampil / stok kosong)
+```
 
-### 🟠 4. Status Pengiriman `accepted` Menjadi Dead-Code
-*   **Masalah:** `DeliverySchedule::STATUS_ACCEPTED` (nilai `'accepted'`) didefinisikan di model dan dimasukkan dalam `scopeActive()`. Namun, pada logika `DeliveryScheduleService::acceptTask()`, status jadwal langsung diubah menjadi `delivering`:
+- **Titik Konflik Logika:**
+    - `users.sppg_id` vs `employees.sppg_id`.
+    - Middleware menyaring dengan benar menggunakan fallback `$user->sppg_id ?? $user->employee?->sppg_id` lalu menaruhnya di `$request->attributes`. Namun, controller-controller utama mengabaikan attribute ini dan langsung mengakses `$request->user()->sppg_id` yang bernilai `null` bagi karyawan non-owner.
+
+---
+
+### 🥗 Alur 2: Perencanaan Menu & Pengurangan Stok Gudang (FIFO)
+
+Alur ini menjelaskan konflik data antara porsi kebutuhan sekolah mitra (untuk potong stok) dengan rencana distribusi fisik pengiriman.
+
+```mermaid
+flowchart TD
+    A([Ahli Gizi menyusun Menu Mingguan]) --> B[Simpan Perencanaan]
+    B --> C{Apakah ada tombol Publish di UI?}
+    C -- Tidak ada --> D[UX BLOCK: Menu selamanya berstatus draft/planned\nStok gudang tidak pernah terpotong secara otomatis]
+
+    C -- Ada backend endpoint --> E[Deduct Stock via FIFO]
+    E --> F[Hitung total porsi:\nsum('portion_count') dari tabel 'partners']
+    F --> G[Potong kuantitas di tabel 'stock_items']
+
+    H([Admin Logistik membuat Jadwal Pengiriman]) --> I[Gunakan data sekolah dari tabel 'schools']
+    I --> J[Tentukan porsi kirim:\nschools.student_count]
+
+    rect rgb(255, 220, 220)
+        F & J --> K{KONFLIK DATA INKONSISTEN:\nApakah partners.portion_count == schools.student_count?}
+        K -- Tidak Sama --> L[ERROR: Jumlah stok bahan baku yang dipotong di gudang\ntidak sama dengan jumlah makanan fisik yang dimasak & didistribusikan!]
+    end
+```
+
+- **Titik Konflik Logika:**
+    - **Inkonsistensi Ganda Tabel Sekolah:** Tabel `schools` digunakan untuk pengiriman/distribusi harian, sedangkan tabel `partners` digunakan untuk perhitungan stok bahan resep mingguan.
+    - Jika `schools.student_count` (misal 500 siswa) tidak sinkron dengan `partners.portion_count` (misal 450 porsi), maka sistem logistik akan memasak 500 porsi tetapi stok gudang hanya dipotong 450 porsi, menyebabkan selisih inventaris riil dengan digital.
+
+---
+
+### 🛵 Alur 3: Penugasan Kurir & Peta Spasial Live
+
+Alur ini menjelaskan celah keamanan (data isolation bypass) yang menyebabkan bocornya lokasi kurir antar SPPG.
+
+```mermaid
+sequenceDiagram
+    autonumber
+    actor AdminA as Admin SPPG Coblong (ID: 9)
+    participant FE as Frontend Map View
+    participant Ctrl as SpatialMapController
+    participant Svc as CourierLocationService
+    participant DB as Database (Postgres)
+
+    AdminA->>FE: Buka Peta Spasial Live
+    FE->>Ctrl: Request GET /api/distribution/map/active-couriers
+    Ctrl->>Svc: getActiveCourierLocations()
+
+    rect rgb(240, 200, 200)
+        Note over Svc: KONFLIK ISOLASI DATA!<br/>Query mengambil seluruh kurir berstatus 'delivering'<br/>tanpa filter sppg_id.
+        Svc->>DB: SELECT * FROM delivery_schedules WHERE status = 'delivering'
+        DB-->>Svc: Kembalikan Data Kurir SPPG Coblong & SPPG Dago
+    end
+
+    Svc-->>Ctrl: Array gabungan seluruh kurir aktif
+    Ctrl-->>FE: Respon sukses + data koordinat kurir kompetitor
+    FE-->>AdminA: Marker kurir SPPG Dago tampil di peta SPPG Coblong
+```
+
+- **Titik Konflik Logika:**
+    - Ketiadaan parameter `sppg_id` pada method `getActiveCourierLocations()`.
+    - Setiap pengiriman (`delivery_schedules`) terhubung ke sekolah (`schools`) yang memiliki `sppg_id`. Karena service tidak memeriksa relasi `school.sppg_id`, data koordinat GPS kurir yang sedang berjalan bocor ke SPPG lain.
+
+---
+
+### 📥 Alur 4: Impor Sekolah Mitra dari File CSV
+
+Alur ini menelusuri kegagalan pembacaan payload CSV dari frontend ke backend.
+
+```mermaid
+flowchart TD
+    A([User upload file CSV di UI]) --> B[Frontend kirim Form-Data dengan field 'file']
+    B --> C[Backend validation: ImportPartnerRequest]
+    C --> C1{Cek parameter 'file'?}
+    C1 -- Ada & valid --> D[Lolos Validasi]
+    C1 -- Tidak ada --> D_ERR[Tolak 422: File is required]
+
+    rect rgb(255, 220, 220)
+        D --> E[PartnerController::import]
+        E --> F[Ambil parameter: $request->input('records', [])]
+        F --> G{KONFLIK PAYLOAD:\nApakah array 'records' ada?}
+        G -- Kosong / Null --> H[Hasil: $records = []]
+    end
+
+    H --> I[Panggil PartnerService::importFromRows dengan array kosong]
+    I --> J[Respon sukses: 'Berhasil mengimpor 0 partner']
+    J --> K([UX FAIL: Sekolah mitra tidak bertambah ke database])
+```
+
+- **Titik Konflik Logika:**
+    - Request Class memvalidasi parameter `'file'` (bertipe File), tetapi Controller mencoba memproses parameter `'records'` (bertipe Array) yang tidak dikirim oleh frontend.
+
+---
+
+## 2. 📂 Ringkasan Kesalahan Kode per Berkas (File-by-File Error Registry)
+
+Berikut adalah daftar letak kesalahan kode program secara spesifik pada sistem Backend:
+
+### 📄 1. [PartnerController.php](file:///d:/SEMESTER 6/ISB-310 SIWEB/TUBES/Backend/app/Http/Controllers/API/AdminSPPG/PartnerController.php#L111-L119)
+
+- **Baris Bermasalah:** L113 - L116
+- **Kode Saat Ini:**
     ```php
-    $schedule->update([
-        'status'      => DeliverySchedule::STATUS_DELIVERING,
-        'departed_at' => now(),
+    $sppgId = $request->attributes->get('sppg_id');
+    $records = $request->input('records', []);
+    $result = $this->partnerService->importFromRows($sppgId, $records);
+    ```
+- **Kesalahan:** Mengabaikan file CSV fisik yang diunggah dan langsung mengambil input `records`. Rute ini diproteksi oleh `ImportPartnerRequest` yang memvalidasi `file` bertipe multipart, tetapi file tersebut tidak pernah disimpan atau di-parse di controller ini.
+- **Perbaikan:** Ambil file lewat `$request->file('file')`, simpan sementara, lalu panggil `$this->partnerService->importFromFile($sppgId, $filePath)`.
+
+### 📄 2. [MenuController.php](file:///d:/SEMESTER 6/ISB-310 SIWEB/TUBES/Backend/app/Http/Controllers/API/AdminSPPG/MenuController.php#L179-L188)
+
+- **Baris Bermasalah:** L182
+- **Kode Saat Ini:**
+    ```php
+    $updated = $this->menuService->refreshAllStatuses();
+    ```
+- **Kesalahan:** Memanggil method `refreshAllStatuses()` pada `MenuService`. Namun, di dalam kelas `MenuService`, method tersebut **tidak ada** (hanya ada `refreshStatus(Menu $menu)`). Hal ini memicu `BadMethodCallException` (Error 500) saat dipanggil.
+- **Perbaikan:** Tulis implementasi method `refreshAllStatuses()` di [MenuService.php](file:///d:/SEMESTER 6/ISB-310 SIWEB/TUBES/Backend/app/Services/SPPG/MenuService.php) untuk mengupdate status menu-menu draf secara massal sesuai tanggal berjalan.
+
+### 📄 3. [CourierLocationService.php](file:///d:/SEMESTER 6/ISB-310 SIWEB/TUBES/Backend/app/Services/Distribution/CourierLocationService.php#L47-L80)
+
+- **Baris Bermasalah:** L49 - L55
+- **Kode Saat Ini:**
+    ```php
+    $activeSchedules = DeliverySchedule::where('status', DeliverySchedule::STATUS_DELIVERING)
+        ->with(['latestLocation', 'courier:id,name', 'school:id,name,latitude,longitude'])
+        ->get();
+    ```
+- **Kesalahan:** Mengambil seluruh jadwal aktif berstatus `delivering` dari database tanpa memfilter berdasarkan `sppg_id` sekolah mitra. Menyebabkan kebocoran koordinat kurir antar SPPG.
+- **Perbaikan:** Tambahkan parameter `int $sppgId` ke method, lalu tambahkan scope filter:
+    ```php
+    $activeSchedules = DeliverySchedule::where('status', DeliverySchedule::STATUS_DELIVERING)
+        ->whereHas('school', fn($q) => $q->where('sppg_id', $sppgId))
+        ->with([...])->get();
+    ```
+
+### 📄 4. [SpatialMapController.php](file:///d:/SEMESTER 6/ISB-310 SIWEB/TUBES/Backend/app/Http/Controllers/API/Distribution/SpatialMapController.php#L131-L143)
+
+- **Baris Bermasalah:** L138 - L140
+- **Kode Saat Ini:**
+    ```php
+    'latitude'  => config('distribution.depot_lat'),
+    'longitude' => config('distribution.depot_lng'),
+    ```
+- **Kesalahan:** Lokasi titik awal (depot dapur) mengambil dari konfigurasi file `.env` secara global. Hal ini membuat semua SPPG (Coblong, Dago, dll) memiliki titik awal rute yang sama di peta, merusak perhitungan optimasi rute AI lokal.
+- **Perbaikan:** Ambil koordinat dynamic dari database relasi SPPG pengguna:
+    ```php
+    $sppg = \App\Models\SPPG::findOrFail($sppgId);
+    return response()->json([
+        'data' => [
+            'name' => $sppg->name,
+            'latitude' => $sppg->latitude,
+            'longitude' => $sppg->longitude
+        ]
     ]);
     ```
-*   **Dampak:** Status `accepted` tidak pernah digunakan. Di sisi UX/UI, status ini akan membingungkan developer atau analis proses bisnis (BPMN) karena ada state mesin yang dilewati.
 
----
+### 📄 5. [StockController.php](file:///d:/SEMESTER 6/ISB-310 SIWEB/TUBES/Backend/app/Http/Controllers/API/AdminSPPG/StockController.php) (Tersebar)
 
-## 2. 🗺️ DETAIL ALUR UX ADMIN SPPG & CEK CACAT LOGIKA
+- **Baris Bermasalah:** L40, L55, L102, L141, L189, L213, L232, L305, L332, L356, L382, L408
+- **Kode Saat Ini:**
+    ```php
+    $sppgId = $request->user()->sppg_id;
+    ```
+- **Kesalahan:** Menggunakan `$request->user()->sppg_id` secara langsung. Nilai ini bernilai `null` bagi akun Karyawan (Ahli Gizi/Admin Logistik) karena data `sppg_id` mereka berada di tabel `employees`.
+- **Perbaikan:** Ubah menjadi `$sppgId = $request->attributes->get('sppg_id');` di setiap method untuk mengambil value yang sudah di-resolve oleh middleware.
 
-Berikut adalah alur interaksi pengguna (UX Flow) secara mendetail untuk Admin SPPG, beserta analisis potensi kecacatan alur secara manual:
+### 📄 6. [DeliveryScheduleController.php](file:///d:/SEMESTER 6/ISB-310 SIWEB/TUBES/Backend/app/Http/Controllers/API/Distribution/DeliveryScheduleController.php)
 
-### 🔵 ALUR UX 1: Dasbor (Dashboard)
-1.  **Akses Masuk:** Admin SPPG login dan diarahkan ke halaman utama Dashboard.
-2.  **Tampilan:**
-    *   Statistik jumlah jadwal distribusi hari ini berdasarkan status (`in_order`, `delivering`, `delivered`, `revision_required`, `confirmed`, `rejected`).
-    *   Notifikasi kelengkapan staf: sistem mendeteksi apakah SPPG ini sudah mendaftarkan Ahli Gizi (`nutritionist`) dan Admin Logistik (`logistics_admin`).
-    *   Alert stok kritis: menampilkan bahan baku dengan status `low`, `empty`, atau mengandung batch yang `expired`.
-3.  **Potensi Cacat UX:**
-    *   Jika Admin Logistik belum didaftarkan, Admin SPPG tidak bisa mendelegasikan pembuatan jadwal pengiriman, namun dashboard tetap menampilkan tab "Distribusi" yang kosong tanpa petunjuk/panduan aktivasi staf yang intuitif.
+- **Baris Bermasalah:** L38 - L75 (Index) & L79 - L87 (Show)
+- **Kesalahan:** Tidak menyaring data berdasarkan `sppg_id` SPPG yang login, melainkan langsung mengambil `DeliverySchedule::active()` secara global.
+- **Perbaikan:** Saring query menggunakan `whereHas('school', fn($q) => $q->where('sppg_id', $sppgId))`.
 
-### 🟢 ALUR UX 2: Manajemen Karyawan & Pembagian Peran
-1.  **Input Data:** Admin SPPG masuk ke menu Karyawan, klik "Tambah Karyawan" (mengisi Nama, NIK, Posisi Struktural, No HP, Alamat, Gaji Pokok, Tanggal Gabung).
-2.  **Pemetaan Sistem (Assign Role):** Setelah data disimpan, Admin harus mengklik "Assign Role" untuk menautkan karyawan tersebut dengan akun pengguna (`User`) dan hak akses (`Role`) di sistem (misal: kurir mendapat role `courier`).
-3.  **Potensi Cacat UX:**
-    *   **Proses Dua Langkah yang Membingungkan:** Admin harus membuat data karyawan terlebih dahulu, baru kemudian menautkan akun user. Jika Admin lupa melakukan langkah kedua, karyawan tersebut tidak akan bisa login ke sistem meskipun statusnya aktif. Idealnya, pembuatan data karyawan struktural dan pembuatan akun sistem disatukan dalam satu form.
+### 📄 7. [StoreDeliveryScheduleRequest.php](file:///d:/SEMESTER 6/ISB-310 SIWEB/TUBES/Backend/app/Http/Requests/Distribution/StoreDeliveryScheduleRequest.php#L19-L29)
 
-### 🟡 ALUR UX 3: Perencanaan Menu Mingguan (Oleh Ahli Gizi)
-1.  **Pembuatan Bahan Baku & Resep:**
-    *   Ahli Gizi mendaftarkan bahan baku (mengisi nilai kalori, karbohidrat, protein, lemak per 100g).
-    *   Ahli Gizi membuat resep (misal: "Ayam Bakar Madu"), memasukkan bahan baku beserta berat gram yang digunakan. Sistem otomatis menjumlahkan nilai gizi resep tersebut.
-2.  **Penyusunan Menu Mingguan:**
-    *   Ahli Gizi membuat Rencana Menu Mingguan (menentukan tanggal mulai Senin dan akhir Kamis).
-    *   Ahli Gizi menjadwalkan resep-resep tersebut pada slot waktu makan (misal: Makan Siang / Makan Malam) per hari. Status awal menu: `planned` / `scheduled`.
-3.  **Publikasi Menu & Blokade Stok (Publishing):**
-    *   Ahli Gizi mengklik "Publish".
-    *   **Sistem Menghitung Kebutuhan:** Porsi per-sekolah dijumlahkan untuk semua sekolah mitra aktif. Jumlah gram bahan baku dikalikan total porsi tersebut.
-    *   **Pengecekan FIFO & Blokade:** Jika stok di gudang (tabel `stock_items` dengan status `available` / `low`) cukup, status menu berubah menjadi `published` dan stok bahan langsung dikurangi. Jika stok kurang sedikit saja, sistem melempar error `StockShortageException` dan membatalkan publikasi menu (**Hard Block**).
-4.  **Potensi Cacat UX:**
-    *   **Hard Block Tanpa Solusi Alternatif:** Ketika sistem memblokir publikasi menu karena kekurangan stok, Ahli Gizi tidak diberi informasi batch mana yang kurang secara visual, sehingga sulit menentukan apakah mereka harus mengubah resep alternatif atau menunggu kiriman stok.
-    *   **Ketiadaan Status Draft:** Menu yang diedit langsung memengaruhi jadwal tanpa adanya status "Menunggu Review" jika Ahli Gizi ingin meminta persetujuan Admin SPPG terlebih dahulu.
+- **Baris Bermasalah:** L22 - L23
+- **Kode Saat Ini:**
+    ```php
+    'courier_id' => ['required', 'integer', 'exists:employees,id'],
+    'school_id'  => ['required', 'integer', 'exists:schools,id'],
+    ```
+- **Kesalahan:** Membiarkan admin menunjuk kurir (`courier_id`) atau sekolah (`school_id`) mana saja di database secara bebas, tanpa divalidasi apakah kurir/sekolah tersebut di bawah naungan SPPG yang sama dengan admin yang membuat jadwal.
+- **Perbaikan:** Batasi validasi exists menggunakan scope `sppg_id`:
+    ```php
+    Rule::exists('employees', 'id')->where('sppg_id', $sppgId)
+    Rule::exists('schools', 'id')->where('sppg_id', $sppgId)
+    ```
 
-### 🔴 ALUR UX 4: Manajemen Stok Gudang
-1.  **Pengajuan Stok (Logistik):** Admin Logistik menginput barang masuk (bahan baku, kuantitas, harga, tanggal kedaluwarsa, supplier, bukti nota pembelian). Status awal: `pending`.
-2.  **Persetujuan (Admin SPPG):** Admin SPPG melihat daftar pengajuan stok di tab "Pending Approval". Admin mengklik "Approve" atau "Reject".
-    *   Jika **Approve**: Stok masuk ke inventaris aktif, mendapatkan nomor batch otomatis (`BATCH-YYYYMMDD-XXX`), dan status bahan baku di-update menjadi `available`.
-3.  **Potensi Cacat UX:**
-    *   **Tidak Ada Edit setelah Approved:** Setelah stok disetujui, kuantitas tidak bisa diedit secara manual meskipun ada kesalahan pencatatan riil. Satu-satunya cara adalah menghapus transaksi atau membuat penyesuaian stok keluar baru, yang merusak historis audit log.
-    *   **Race Condition Penomoran Batch:** Jika dua admin menyetujui stok secara bersamaan, penomoran batch bisa bertabrakan karena dibaca secara non-atomic dari database sebelum ditulis ulang.
+### 📄 8. [2026_05_12_160000_create_partners_table.php](file:///d:/SEMESTER 6/ISB-310 SIWEB/TUBES/Backend/database/migrations/2026_05_12_160000_create_partners_table.php#L14)
 
-### 🟣 ALUR UX 5: Siklus Distribusi (Alur Paling Rawan Cacat)
-1.  **Pembuatan Jadwal:** Admin Logistik menentukan sekolah tujuan, kurir, tipe kendaraan, plat nomor, jam keberangkatan, dan membuat draft jadwal (`status: in_order`).
-2.  **Pengiriman Tugas:** Admin SPPG meninjau draf tersebut dan menekan "Kirim Tugas" (status tetap `in_order` tetapi kolom `submitted_by` terisi). Reverb menyiarkan notifikasi ke handphone kurir.
-3.  **Respons Kurir:**
-    *   Jika **Ditolak**: Kurir menginput alasan penolakan. Status berubah menjadi `rejected`. Admin Logistik harus mengubah jadwal dan mengirim ulang.
-    *   Jika **Diterima**: Kurir menekan "Terima". Status otomatis berubah menjadi `delivering` dan kurir mulai mengirim koordinat GPS secara real-time.
-4.  **Bukti Pengiriman:** Kurir sampai di sekolah, mengambil foto bukti, lalu mengirimnya. Status berubah menjadi `delivered`.
-5.  **Verifikasi & Arsip:** Admin Logistik memeriksa bukti foto kurir.
-    *   Jika **Sesuai**: Klik "Konfirmasi". Status menjadi `confirmed` dan data dipindahkan ke snapshot tabel riwayat (`delivery_histories`).
-    *   Jika **Tidak Sesuai**: Klik "Revisi". Status menjadi `revision_required`. Kurir harus mengambil ulang foto atau mengunggah bukti baru.
-6.  **Potensi Cacat UX:**
-    *   **Cacat Otorisasi Kurir:** Di controller, kurir manapun bisa menekan tombol "Terima" (`acceptTask`) atau "Tolak" (`rejectTask`) pada jadwal kurir lain karena sistem hanya memeriksa apakah user memiliki role `courier` tanpa memastikan `courier_id` pada jadwal adalah miliknya sendiri.
-    *   **Tidak Ada Tombol Cancel/Batal:** Begitu tugas dikirim ke kurir, Admin tidak memiliki opsi untuk menarik kembali (cancel) tugas tersebut jika terjadi kesalahan rute mendadak sebelum kurir mengkliknya.
-    *   **Blokade Manual Saat Revisi:** Jika status dalam `revision_required`, tidak ada batas waktu otomatis. Pengiriman bisa tersangkut selamanya jika kurir tidak merespons revisi tersebut.
+- **Baris Bermasalah:** L14
+- **Kode Saat Ini:**
+    ```php
+    $table->string('npsn')->nullable()->unique();
+    ```
+- **Kesalahan:** Kolom `npsn` diset sebagai `unique()` secara global di level database Postgres. Jika SPPG A melayani sekolah X dengan NPSN 123, maka SPPG B tidak akan pernah bisa melayani atau mendaftarkan sekolah tersebut karena database akan menolak duplikasi.
+- **Perbaikan:** Ubah unique constraint menjadi composite unique key:
+    ```php
+    $table->unique(['sppg_id', 'npsn']);
+    ```

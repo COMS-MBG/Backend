@@ -7,7 +7,7 @@ use App\Http\Requests\Partner\ImportPartnerRequest;
 use App\Http\Requests\Partner\StorePartnerRequest;
 use App\Http\Requests\Partner\UpdatePartnerRequest;
 use App\Http\Resources\PartnerResource;
-use App\Services\SPPG\PartnerService;
+use App\Services\Partner\PartnerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -113,7 +113,8 @@ class PartnerController extends Controller
         $sppgId = $request->attributes->get('sppg_id');
         $records = $request->input('records', []); 
         
-        $count = $this->partnerService->importFromFile($sppgId, $records);
-        return response()->json(['success' => true, 'message' => "Berhasil mengimpor {$count} partner."]);
+        $result = $this->partnerService->importFromRows($sppgId, $records);
+        $count  = $result['created'] + $result['updated'];
+        return response()->json(['success' => true, 'message' => "Berhasil mengimpor {$count} partner.", 'data' => $result]);
     }
 }

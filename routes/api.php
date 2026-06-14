@@ -17,6 +17,6 @@ require __DIR__.'/api_public.php';
  * FULL BASE URL: /api/distribution/...
  * ═══════════════════════════════════════════════════════════════
  */
-Route::middleware(['auth:sanctum'])
+Route::middleware(['auth:sanctum', 'scope.sppg'])
     ->prefix('distribution')
     ->group(base_path('routes/distribution.php'));

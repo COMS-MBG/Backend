@@ -18,6 +18,7 @@ class Recipe extends Model
     protected $table = 'recipes';
 
     protected $fillable = [
+        'sppg_id',
         'name',
         'description',
         'target_calorie',
